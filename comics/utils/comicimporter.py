@@ -1,20 +1,32 @@
-import json
+from datetime import datetime
 import os
-import datetime
 import re
 import requests
 import requests_cache
 import logging
-from django.utils.text import slugify
 from urllib.request import urlretrieve
-from urllib.parse import quote_plus, unquote_plus
-from comics.models import Arc, Character, Creator, Team, Publisher, Series, Issue, Roles, Settings
-from .comicfilehandler import ComicFileHandler
-from . import fnameparser, utils
+from urllib.parse import unquote_plus
 
+from django.utils import timezone
+from django.utils.text import slugify
+
+from .comicapi.comicarchive import MetaDataStyle, ComicArchive
 from .comicapi.issuestring import IssueString
 
-from fuzzywuzzy import fuzz
+from comics.models import (Arc, Character, Creator, Issue, Publisher,
+                           Roles, Series, Settings, Team)
+
+from . import utils
+
+
+def get_recursive_filelist(pathlist):
+    # Get a recursive list of all files under all path items in the list.
+    filelist = []
+    if os.path.isdir(pathlist):
+        for root, dirs, files in os.walk(pathlist):
+            for f in files:
+                filelist.append(os.path.join(root, f))
+    return filelist
 
 
 class ComicImporter(object):
@@ -25,8 +37,8 @@ class ComicImporter(object):
         self.logger = logging.getLogger('tenma')
 
         # Setup requests caching
-        requests_cache.install_cache(
-            './media/CACHE/comicvine-cache', expire_after=1800)
+        requests_cache.install_cache('./media/CACHE/comicvine-cache',
+                                     expire_after=1800)
         requests_cache.core.remove_expired_responses()
 
         # Set basic reusable strings
@@ -36,475 +48,51 @@ class ComicImporter(object):
         # API Strings
         self.baseurl = 'https://comicvine.gamespot.com/api/'
         self.imageurl = 'https://comicvine.gamespot.com/api/image/'
-        self.base_params = {'format': 'json', 'api_key': self.api_key}
+        self.base_params = {'format': 'json',
+                            'api_key': self.api_key}
         self.headers = {'user-agent': 'tenma'}
 
         # API field strings
         self.arc_fields = 'deck,description,id,image,name,site_detail_url'
         self.character_fields = 'deck,description,id,image,name,site_detail_url'
         self.creator_fields = 'deck,description,id,image,name,site_detail_url'
-        self.issue_fields = 'api_detail_url,character_credits,cover_date,deck,description,id,image,issue_number,name,person_credits,site_detail_url,story_arc_credits,team_credits,volume'
         self.publisher_fields = 'deck,description,id,image,name,site_detail_url'
-        self.query_issue_fields = 'cover_date,id,issue_number,name,volume'
-        self.query_issue_limit = '100'
         self.series_fields = 'api_detail_url,deck,description,id,name,publisher,site_detail_url,start_year'
+        self.issue_fields = 'api_detail_url,character_credits,cover_date,deck,description,id,image,issue_number,name,person_credits,site_detail_url,story_arc_credits,team_credits,volume'
         self.team_fields = 'characters,deck,description,id,image,name,site_detail_url'
 
-        # International reprint publishers
-        # Ordered by # of issues (est.) for quick matching.
-        self.int_pubs = [
-            2350,  # Panini (21.5k)
-            2812,  # Marvel UK (4.2k)
-            2094,  # Abril (2.1k)
-            2319,  # Planeta DeAgostini (2.1k)
-            2903,  # Ediciones Zinco (0.7k)
-            1133,  # Semic As (0.3k)
-            2961,  # Marvel Italia (0.04k)
-        ]
+        # Initial Comic Book info to search
+        self.style = MetaDataStyle.CIX
 
-    #=========================================================================
+    def checkIfRemovedOrModified(self, comic, pathlist):
+        remove = False
 
-    def import_comic_files(self):
-        ''' Main entry point to import comic files. '''
+        def inFolderlist(filepath, pathlist):
+            for p in pathlist:
+                if p in filepath:
+                    return True
+            return False
 
-        excluded = Issue.objects.values_list(
-            'file', flat=True).order_by('file')
-        self._process_dir(self.directory_path, excluded)
-
-    #=========================================================================
-
-    def _process_dir(self, path, excluded):
-        for entry in os.scandir(path):
-            # If file, process issue. If directory, process series.
-            if entry.is_file():
-                # Check for unprocessed files:
-                if entry.path not in excluded:
-                    # Check comic file validity
-                    if utils.valid_comic_file(entry.name):
-                        # Attempt to find match
-                        cvid = ''
-                        if self.api_key != '':
-                            cvid = self._find_issue_match(entry.name)
-                            if cvid != '':
-                                # Process issue with ComicVine
-                                try:
-                                    self._process_issue(entry.path, cvid)
-                                except Exception:
-                                    self.logger.exception(
-                                        'An error occurred while processing %s' % entry.path)
-                            else:
-                                # Process issue without ComicVine
-                                try:
-                                    self._process_issue_without_cvid(
-                                        entry.path)
-                                except Exception:
-                                    self.logger.exception(
-                                        'An error occurred while processing %s' % entry.path)
-            else:
-                self._process_dir(entry.path, excluded)
-
-    #=========================================================================
-
-    def reprocess_issue(self, slug):
-        ''' Reprocess an existing issue in the comics directories. '''
-
-        issue = Issue.objects.get(slug=slug)
-        cvid = ''
-
-        # Check if there's already a cvid.
-        if issue.cvid and issue.cvid != '':
-            cvid = issue.cvid
+        if not (os.path.exists(comic.file)):
+            self.logger.info("Removing missing {0}".format(comic.file))
+            remove = True
+        elif not inFolderlist(comic.file, pathlist):
+            self.logger.info("Removing unwanted {0}".format(comic.file))
+            remove = True
         else:
-            # Attempt to find match
-            if self.api_key != '':
-                cvid = self._find_issue_match(issue.file)
-            else:
-                cvid = ''
-
-        # Update issue
-        if cvid != '':
-            # Process the issue with ComicVine
-            self._process_issue(issue.file, cvid)
-        else:
-            self._reprocess_issue_without_cvid(issue.id)
-
-    #=========================================================================
-
-    def _find_issue_match(self, filename):
-        '''
-        Try to find a match in ComicVine for an issue.
-
-        Returns a ComicVine ID.
-        '''
-
-        # Initialize response
-        found_issue = None
-        cvid = ''
-
-        # Attempt to extract series name, issue number, and year
-        extracted = fnameparser.extract(filename)
-        series_name = utils.remove_special_characters(extracted[0])
-        series_name_url = quote_plus(series_name)
-        issue_number = extracted[1] if extracted[1] else '1'
-        issue_year = extracted[2]
-
-        # First check if there's already a series locally
-        matching_series = Series.objects.filter(name=series_name)
-
-        if matching_series:
-            if not matching_series[0].cvid == '':
-                found_issue = self._find_match_with_series(
-                    matching_series[0].cvid, issue_number)
-
-        if found_issue is None:
-            # Query Parameters
-            query_params = self.base_params
-            query_params['resources'] = 'issue'
-            query_params['field_list'] = self.query_issue_fields
-            query_params['limit'] = self.query_issue_limit
-
-            # Check for series name and issue number, or just series name
-            if series_name and issue_number:
-                query_params['query'] = series_name + ' ' + issue_number
-                query_response = requests.get(
-                    self.baseurl + 'search',
-                    params=query_params,
-                    headers=self.headers
-                ).json()
-            elif series_name:
-                query_params['query'] = series_name_url
-                query_response = requests.get(
-                    self.baseurl + 'search',
-                    params=query_params,
-                    headers=self.headers
-                ).json()
-
-            best_option_list = []
-
-            # Try to find the closest match.
-            for issue in query_response['results']:
-                item_year = datetime.date.today().year
-                item_number = 1
-                item_name = ''
-                item_pub_id = ''
-
-                if 'cover_date' in issue:
-                    if issue['cover_date']:
-                        item_year = issue['cover_date'][0:4]
-                if 'issue_number' in issue:
-                    if issue['issue_number']:
-                        item_number = issue['issue_number']
-                if 'volume' in issue:
-                    if 'name' in issue['volume']:
-                        if issue['volume']['name']:
-                            item_name = issue['volume']['name']
-                            item_name = utils.remove_special_characters(
-                                item_name)
-
-                    # Get publisher ID
-                    pub_check_params = self.base_params
-                    pub_check_params['field_list'] = 'publisher'
-                    pub_check_response = requests.get(
-                        self.baseurl + 'volume/4050-' +
-                        str(issue['volume']['id']),
-                        params=pub_check_params,
-                        headers=self.headers,
-                    ).json()
-
-                    if 'publisher' in pub_check_response['results']:
-                        if pub_check_response['results']['publisher'] is not None:
-                            item_pub_id = pub_check_response[
-                                'results']['publisher']['id']
-
-                # Get the match score (0-5)
-                if series_name:
-                    # Fuzzy match the series name.
-                    # Gives a score between 0 and 2.
-                    score = (fuzz.ratio(item_name.lower(), series_name.lower(
-                    )) + fuzz.partial_ratio(item_name.lower(), series_name.lower())) / 100
-
-                    # If the issue number is the same, add 1 point.
-                    if item_number == issue_number:
-                        score += 1
-
-                    # If the year is the same, add 2 points.
-                    if issue_year != '':
-                        if item_year == issue_year:
-                            score += 2
-
-                    # If the publisher is an international reprint, subtract a
-                    # point.
-                    if item_pub_id != '':
-                        if item_pub_id in self.int_pubs:
-                            score = score - 1 if score > 1 else 0
-
-                    # Add the issue and it's score to the list.
-                    best_option_list.insert(0, {
-                        'score': score,
-                        'issue': issue,
-                    })
-
-            # Sort the list by score, and pick the top scoring issue.
-            best_option_list.sort(key=lambda x: x['score'], reverse=True)
-            found_issue = best_option_list[0][
-                'issue'] if best_option_list else None
-
-        cvid = found_issue['id'] if found_issue else ''
-
-        if found_issue is not None:
-            if 'volume' in found_issue:
-                if 'name' in found_issue['volume']:
-                    if found_issue['volume']['name']:
-                        series = found_issue['volume']['name']
-            elif matching_series:
-                series = matching_series[0].name
-            if 'issue_number' in found_issue:
-                if found_issue['issue_number']:
-                    number = found_issue['issue_number']
-                else:
-                    number = ''
-            self.logger.info('\"%(filename)s\" was matched on Comic Vine as \"%(series)s - #%(number)s\" (%(CVID)s)' % {
-                'filename': filename,
-                'series': series,
-                'number': number,
-                'CVID': cvid
-            })
-        else:
-            self.logger.warning(
-                'No match was found for \"%s\" on Comic Vine.' % filename)
-
-        return cvid
-
-    #=========================================================================
-
-    def _find_match_with_series(self, series_cvid, issue_number):
-        '''
-        Try to retrieve a match based on an existing series name.
-
-        Returns an issue from list.
-        '''
-
-        found_issue = None
-
-        if issue_number:
-            # Query Parameters
-            query_params = self.base_params
-            query_params['field_list'] = 'issues,name'
-
-            # Attempt to find issue based on extracted Series Name and Issue
-            # Number
-            query_response = requests.get(
-                self.baseurl + 'volume/4050-' + str(series_cvid),
-                params=query_params,
-                headers=self.headers,
-            ).json()
-
-            # Try to find the closest match.
-            for issue in query_response['results']['issues']:
-                item_number = issue['issue_number'] if issue[
-                    'issue_number'] else ''
-                if item_number == issue_number:
-                    found_issue = issue
-
-        return found_issue
-
-    #=========================================================================
-
-    def _process_issue_without_cvid(self, filepath):
-        '''	Create an issue without a ComicVine ID.	'''
-
-        # Make sure the issue hadn't already been added
-        matching_issue = Issue.objects.filter(file=filepath)
-
-        filename = os.path.basename(filepath)
-
-        if not matching_issue:
-            # 1. Attempt to extract series name, issue number, and year
-            extracted = fnameparser.extract(filepath)
-            series_name = extracted[0]
-            issue_number = extracted[1]
-            issue_year = extracted[2]
-
-            # 2. Set Issue Information:
-            issue = Issue()
-            issue.file = filepath
-            issue.number = issue_number if issue_number else 1
-            issue.date = issue_year + '-01-01' if issue_year else datetime.date.today()
-
-            cfh = ComicFileHandler()
-            issue.cover = cfh.extract_cover(filepath)
-            issue.page_count = cfh.get_page_count(filepath)
-
-            # 3. Set Series Information:
-            matching_series = Series.objects.filter(name=series_name)
-
-            if not matching_series:
-                series = Series()
-                series.name = series_name
-                series.save()
-                issue.series = series
-            else:
-                issue.series = matching_series[0]
-
-            # 4. Save Issue.
-            issue.save()
-        else:
-            self._reprocess_issue_without_cvid(matching_issue[0].id)
-
-        self.logger.info('\"%(filename)s\" was processed successfully as \"%(series)s - #%(number)s\"' % {
-            'filename': filename,
-            'series': issue.series.name,
-            'number': issue.number
-        })
-
-    #=========================================================================
-
-    def _reprocess_issue_without_cvid(self, issue_id):
-        '''	Create an issue without a ComicVine ID.	'''
-
-        # Make sure the issue exists
-        issue = Issue.objects.get(id=issue_id)
-
-        if issue:
-            # 1. Attempt to extract series name, issue number, year and cover.
-            extracted = fnameparser.extract(issue.file)
-            series_name = extracted[0]
-            issue_number = extracted[1]
-            issue_year = extracted[2]
-
-            cfh = ComicFileHandler()
-            issue_cover = cfh.extract_cover(issue.file)
-            issue.page_count = cfh.get_page_count(issue.file)
-
-            num = issue_number if issue_number else 1
-
-            # 2. Update Issue information:
-            Issue.objects.filter(id=issue_id).update(
-                number=IssueString(num).asString(pad=3),
-                date=issue_year + '-01-01' if issue_year else datetime.date.today(),
-                cover=issue_cover,
-            )
-
-            # 3. Update Series information:
-            if Series.objects.get(id=issue.series.id):
-                Series.objects.filter(id=issue.series.id).update(
-                    name=series_name,
-                )
-            else:
-                series = Series()
-                series.name = series_name
-                series.save()
-                issue.series = series
-                issue.save()
-
-    #=========================================================================
-
-    def _process_issue(self, filename, cvid):
-        '''	Creates or updates metadata from ComicVine for an Issue. '''
-
-        # 1. Make initial API call
-        # Query Parameters
-        issue_params = self.base_params
-        issue_params['field_list'] = self.issue_fields
-
-        response_issue = requests.get(
-            self.baseurl + 'issue/4000-' + str(cvid),
-            params=issue_params,
-            headers=self.headers,
-        ).json()
-
-        # 2. Set Series
-        matching_series = Series.objects.filter(
-            cvid=response_issue['results']['volume']['id'])
-
-        if not matching_series:
-            series = self._create_series(response_issue['results'][
-                                         'volume']['api_detail_url'])
-        else:
-            series = self._update_series(matching_series[0].id, response_issue[
-                                         'results']['volume']['api_detail_url'])
-
-        # 3. Set Issue
-        matching_issue = Issue.objects.filter(file=filename)
-
-        if not matching_issue:
-            issue = self._create_issue(filename, response_issue['results'][
-                                       'api_detail_url'], series.id)
-        else:
-            issue = self._update_issue(matching_issue[0].id, response_issue[
-                                       'results']['api_detail_url'], series.id)
-
-        # 4. Set Publisher
-        # Query Parameters
-        series_params = self.base_params
-        series_params['field_list'] = 'publisher'
-
-        response_series = requests.get(
-            response_issue['results']['volume']['api_detail_url'],
-            params=series_params,
-            headers=self.headers,
-        ).json()
-
-        matching_publisher = Publisher.objects.filter(
-            cvid=response_series['results']['publisher']['id'])
-
-        if not matching_publisher:
-            self._create_publisher(response_series['results']['publisher'][
-                                   'api_detail_url'], issue.series.id)
-        else:
-            self._update_publisher(matching_publisher[0].id, response_series['results'][
-                                   'publisher']['api_detail_url'], issue.series.id)
-
-        # 5. Set Arcs
-        for story_arc in response_issue['results']['story_arc_credits']:
-            matching_arc = Arc.objects.filter(cvid=story_arc['id'])
-            if not matching_arc:
-                self._create_arc(story_arc['api_detail_url'], issue.id)
-            else:
-                issue.arcs.add(self._update_arc(
-                    matching_arc[0].id, story_arc['api_detail_url']))
-
-        # 6. Set Characters
-        for character in response_issue['results']['character_credits']:
-            matching_character = Character.objects.filter(cvid=character['id'])
-            if not matching_character:
-                self._create_character(character['api_detail_url'], issue.id)
-            else:
-                issue.characters.add(self._update_character(
-                    matching_character[0].id, character['api_detail_url']))
-
-        # 7. Set Creators
-        for person in response_issue['results']['person_credits']:
-            matching_creator = Creator.objects.filter(cvid=person['id'])
-            if not matching_creator:
-                self._create_creator(person['api_detail_url'], re.sub(
-                    ' ', '', person['role']), issue.id)
-            else:
-                Roles.objects.create(
-                    creator=matching_creator[0],
-                    issue=issue,
-                    roles=re.sub(' ', '', person['role'])
-                )
-
-        # 8. Set Teams
-        for team in response_issue['results']['team_credits']:
-            matching_team = Team.objects.filter(cvid=team['id'])
-            if not matching_team:
-                self._create_team(team['api_detail_url'], issue.id)
-            else:
-                issue.teams.add(self._update_team(
-                    matching_team[0].id, team['api_detail_url']))
-
-        self.logger.info('\"%(filename)s\" was processed successfully as \"%(series)s - #%(number)s\" (%(CVID)s)' % {
-            'filename': filename,
-            'series': series.name,
-            'number': issue.number,
-            'CVID': issue.cvid
-        })
-
-    #=========================================================================
-
-    def _get_object_data(self, response):
+            current_timezone = timezone.get_current_timezone()
+            c = datetime.utcfromtimestamp(os.path.getmtime(comic.file))
+            curr = timezone.make_aware(c, current_timezone)
+            prev = comic.mod_ts
+
+            if curr != prev:
+                self.logger.info("Removing modified {0}".format(comic.file))
+                remove = True
+
+        if remove:
+            comic.delete()
+
+    def get_cv_object_data(self, response):
         '''
         Gathers object data from a response and tests each value to make sure
         it exists in the response before trying to set it.
@@ -517,7 +105,6 @@ class ComicImporter(object):
 
         # Get Name
         name = ''
-
         if 'name' in response:
             if response['name']:
                 name = response['name']
@@ -536,23 +123,16 @@ class ComicImporter(object):
             if response['issue_number']:
                 number = response['issue_number']
 
-        # Get Date (only exists for Issue objects)
-        date = datetime.date.today()
-
-        if 'cover_date' in response:
-            if response['cover_date']:
-                date = response['cover_date']
-
         # Get Description (Favor short description if available)
         desc = ''
 
         if 'deck' in response:
             if response['deck']:
                 desc = response['deck']
-        if desc == '':
-            if 'description' in response:
-                if response['description']:
-                    desc = utils.parse_CV_HTML(response['description'])
+            if desc == '':
+                if 'description' in response:
+                    if response['description']:
+                        desc = utils.parse_CV_HTML(response['description'])
 
         # Get Image
         image = ''
@@ -568,526 +148,50 @@ class ComicImporter(object):
 
         # Create data object
         data = {
-            'cvid': response['id'],  				# Always exists
-            'cvurl': response['site_detail_url'],  	# Always exists
+            'cvid': response['id'],
+            'cvurl': response['site_detail_url'],
             'name': name,
             'year': year,
             'number': number,
-            'date': date,
             'desc': desc,
             'image': image,
         }
 
         return data
 
-    #=========================================================================
+    def getCVIssue(self, issue_cvid):
+        issue_params = self.base_params
+        issue_params['field_list'] = self.issue_fields
 
-    def _create_arc(self, api_url, issue_id):
-        '''
-        Creates Arc from ComicVine API URL and adds it to
-        it's corresponding Issue.
-
-        Returns the Arc object created.
-        '''
-
-        # Request and Response
-        params = self.base_params
-        params['field_list'] = self.arc_fields
-
-        response = requests.get(
-            api_url,
-            params=params,
+        response_issue = requests.get(
+            self.baseurl + 'issue/4000-' + str(issue_cvid),
+            params=issue_params,
             headers=self.headers,
         ).json()
 
-        data = self._get_object_data(response['results'])
+        return response_issue
 
-        issue = Issue.objects.get(id=issue_id)
+    def getIssueCV(self, issue_cvid, response_issue):
+        issue_params = self.base_params
+        issue_params['field_list'] = self.issue_fields
 
-        # Create Arc
-        a = issue.arcs.create(
-            cvid=data['cvid'],
-            cvurl=data['cvurl'],
-            name=data['name'],
-            slug=slugify(data['name']),
-            desc=data['desc'],
-            image=data['image'],
-        )
-
-        return a
-
-    #=========================================================================
-
-    def _create_character(self, api_url, issue_id):
-        '''
-        Creates Character from ComicVine API URL and adds it to
-        it's corresponding Issue.
-
-        Returns the Character object created.
-        '''
-
-        # Request and Response
-        params = self.base_params
-        params['field_list'] = self.character_fields
+        api_url = response_issue['results']['api_detail_url']
 
         response = requests.get(
             api_url,
-            params=params,
+            params=issue_params,
             headers=self.headers,
         ).json()
 
-        data = self._get_object_data(response['results'])
-
-        issue = Issue.objects.get(id=issue_id)
-
-        # Create Character
-        ch = issue.characters.create(
-            cvid=data['cvid'],
-            cvurl=data['cvurl'],
-            name=data['name'],
-            slug=slugify(data['name']),
-            desc=data['desc'],
-            image=data['image'],
-        )
-
-        return ch
-
-    #=========================================================================
-
-    def _create_creator(self, api_url, roles, issue_id):
-        '''
-        Creates Creator from ComicVine API URL and adds it to
-        it's corresponding Issue.
-
-        Returns the Creator object created.
-        '''
-
-        # Request and Response
-        params = self.base_params
-        params['field_list'] = self.creator_fields
-
-        response = requests.get(
-            api_url,
-            params=params,
-            headers=self.headers,
-        ).json()
-
-        data = self._get_object_data(response['results'])
-
-        issue = Issue.objects.get(id=issue_id)
-
-        # Create Creator
-        cr = Creator.objects.create(
-            cvid=data['cvid'],
-            cvurl=data['cvurl'],
-            name=data['name'],
-            slug=slugify(data['name']),
-            desc=data['desc'],
-            image=data['image'],
-        )
-
-        # Create Role in issue
-        r = Roles.objects.create(
-            creator=cr,
-            issue=issue,
-            roles=roles
-        )
-
-        return cr
-
-    #=========================================================================
-
-    def _create_issue(self, file, api_url, series_id):
-        '''
-        Creates Issue from ComicVine API URL and adds the
-        corresponding Series.
-
-        Returns the Issue object created.
-        '''
-        cfh = ComicFileHandler()
-
-        # Request and Response
-        params = self.base_params
-        params['field_list'] = self.issue_fields
-
-        response = requests.get(
-            api_url,
-            params=params,
-            headers=self.headers,
-        ).json()
-
-        data = self._get_object_data(response['results'])
-
-        series = Series.objects.get(id=series_id)
-
-        fixed_number = IssueString(data['number']).asString(pad=3)
-
-        if (data['date']) is not None:
-            dt = datetime.datetime.strptime(data['date'], "%Y-%m-%d")
-            slugy = series.name + ' ' + fixed_number + ' ' + str(dt.year)
-        else:
-            slugy = series.name + ' ' + fixed_number
-
-        # Create Issue
-        i = Issue.objects.create(
-            cvid=data['cvid'],
-            cvurl=data['cvurl'],
-            name=data['name'],
-            slug=slugify(slugy),
-            desc=data['desc'],
-            number=fixed_number,
-            date=data['date'],
-            file=file,
-            series=series,
-            cover=data['image'],
-            page_count=cfh.get_page_count(file),
-        )
-
-        return i
-
-    #=========================================================================
-
-    def _create_publisher(self, api_url, series_id):
-        '''
-        Creates Publisher from ComicVine API URL and adds it to
-        it's corresponding Series.
-
-        Returns the Publisher object created.
-        '''
-
-        # Request and Response
-        params = self.base_params
-        params['field_list'] = self.publisher_fields
-
-        response = requests.get(
-            api_url,
-            params=params,
-            headers=self.headers,
-        ).json()
-
-        data = self._get_object_data(response['results'])
-
-        # Create Publisher
-        p = Publisher.objects.create(
-            cvid=data['cvid'],
-            cvurl=data['cvurl'],
-            name=data['name'],
-            slug=slugify(data['name']),
-            desc=data['desc'],
-            logo=data['image'],
-        )
-
-        # Add Publisher to Series
-        series = Series.objects.get(id=series_id)
-        series.publisher = p
-        series.save()
-
-        return p
-
-    #=========================================================================
-
-    def _create_team(self, api_url, issue_id):
-        '''
-        Creates Team from ComicVine API URL and adds it to
-        it's corresponding Issue.
-
-        Returns the Team object created.
-        '''
-
-        # Request and Response
-        params = self.base_params
-        params['field_list'] = self.team_fields
-
-        response = requests.get(
-            api_url,
-            params=params,
-            headers=self.headers,
-        ).json()
-
-        data = self._get_object_data(response['results'])
-
-        issue = Issue.objects.get(id=issue_id)
-
-        # Create Team
-        t = issue.teams.create(
-            cvid=data['cvid'],
-            cvurl=data['cvurl'],
-            name=data['name'],
-            slug=slugify(data['name']),
-            desc=data['desc'],
-            image=data['image'],
-        )
-
-        # Add existing Characters to Team
-        for character in response['results']['characters']:
-            matching_character = Character.objects.filter(cvid=character['id'])
-            if matching_character:
-                team_item = Team.objects.filter(cvid=t.cvid)
-                matching_character[0].teams.add(team_item[0])
-
-        return t
-
-    #=========================================================================
-
-    def _create_series(self, api_url):
-        '''
-        Creates Series from ComicVine API URL.
-
-        Returns the Series object created.
-        '''
-
-        # Request and Response
-        params = self.base_params
-        params['field_list'] = self.series_fields
-
-        response = requests.get(
-            api_url,
-            params=params,
-            headers=self.headers,
-        ).json()
-
-        data = self._get_object_data(response['results'])
-
-        if (data['year']) is not None:
-            slugy = (data['name'] + ' ' + data['year'])
-        else:
-            slugy = data['name']
-
-        # Create Series
-        s = Series.objects.create(
-            cvid=data['cvid'],
-            cvurl=data['cvurl'],
-            name=data['name'],
-            slug=slugify(slugy),
-            desc=data['desc'],
-            year=data['year'],
-        )
-
-        return s
-
-    #=========================================================================
-
-    def _update_arc(self, obj_id, api_url):
-        '''
-        Updates Arc from ComicVine API URL.
-
-        Returns the Arc object udpated.
-        '''
-
-        # Request and Response
-        params = self.base_params
-        params['field_list'] = self.arc_fields
-
-        response = requests.get(
-            api_url,
-            params=params,
-            headers=self.headers,
-        ).json()
-
-        data = self._get_object_data(response['results'])
-
-        # Update Arc
-        Arc.objects.filter(id=obj_id).update(
-            cvurl=data['cvurl'],
-            name=data['name'],
-            slug=slugify(data['name']),
-            desc=data['desc'],
-            image=data['image'],
-        )
-
-        return Arc.objects.get(id=obj_id)
-
-    #=========================================================================
-
-    def _update_character(self, obj_id, api_url):
-        '''
-        Updates Character from ComicVine API URL.
-
-        Returns the Character object udpated.
-        '''
-
-        # Request and Response
-        params = self.base_params
-        params['field_list'] = self.character_fields
-
-        response = requests.get(
-            api_url,
-            params=params,
-            headers=self.headers,
-        ).json()
-
-        data = self._get_object_data(response['results'])
-
-        # Update Character
-        Character.objects.filter(id=obj_id).update(
-            cvurl=data['cvurl'],
-            name=data['name'],
-            slug=slugify(data['name']),
-            desc=data['desc'],
-            image=data['image'],
-        )
-
-        return Character.objects.get(id=obj_id)
-
-    #=========================================================================
-
-    def _update_creator(self, obj_id, api_url):
-        '''
-        Updates Creator from ComicVine API URL.
-
-        Returns the Creator object udpated.
-        '''
-
-        # Request and Response
-        params = self.base_params
-        params['field_list'] = self.creator_fields
-
-        response = requests.get(
-            api_url,
-            params=params,
-            headers=self.headers,
-        ).json()
-
-        data = self._get_object_data(response['results'])
-
-        # Update Creator
-        Creator.objects.filter(id=obj_id).update(
-            cvurl=data['cvurl'],
-            name=data['name'],
-            slug=slugify(data['name']),
-            desc=data['desc'],
-            image=data['image'],
-        )
-
-        return Creator.objects.get(id=obj_id)
-
-    #=========================================================================
-
-    def _update_issue(self, obj_id, api_url, series_id):
-        '''
-        Updates Issue from ComicVine API URL.
-
-        Returns the Issue object udpated.
-        '''
-
-        # Request and Response
-        params = self.base_params
-        params['field_list'] = self.issue_fields
-
-        response = requests.get(
-            api_url,
-            params=params,
-            headers=self.headers,
-        ).json()
-
-        data = self._get_object_data(response['results'])
-
-        issue = Issue.objects.get(id=obj_id)
-        self._reset_issue(issue.id)
-
-        series = Series.objects.get(id=series_id)
-
-        fixed_number = IssueString(data['number']).asString(pad=3)
-
-        if (data['date']) is not None:
-            dt = datetime.datetime.strptime(data['date'], "%Y-%m-%d")
-            slugy = series.name + ' ' + fixed_number + ' ' + str(dt.year)
-        else:
-            slugy = series.name + ' ' + fixed_number
+        data = self.get_cv_object_data(response['results'])
 
         # Update Issue
-        Issue.objects.filter(id=obj_id).update(
-            cvurl=data['cvurl'],
-            name=data['name'],
-            slug=slugify(slugy),
-            desc=data['desc'],
-            number=fixed_number,
-            date=data['date'],
-            series=series,
+        Issue.objects.filter(cvid=issue_cvid).update(
             cover=data['image'],
-        )
-
-        return Issue.objects.get(id=obj_id)
-
-    #=========================================================================
-
-    def _update_publisher(self, obj_id, api_url, series_id):
-        '''
-        Updates Publisher from ComicVine API URL.
-
-        Returns the Publisher object udpated.
-        '''
-
-        # Request and Response
-        params = self.base_params
-        params['field_list'] = self.publisher_fields
-
-        response = requests.get(
-            api_url,
-            params=params,
-            headers=self.headers,
-        ).json()
-
-        data = self._get_object_data(response['results'])
-
-        # Update Publisher
-        Publisher.objects.filter(id=obj_id).update(
-            cvurl=data['cvurl'],
-            name=data['name'],
-            slug=slugify(data['name']),
             desc=data['desc'],
-            logo=data['image'],
         )
 
-        # Add Publisher to Series
-        series = Series.objects.get(id=series_id)
-        series.publisher = Publisher.objects.get(id=obj_id)
-        series.save()
-
-        return Publisher.objects.get(id=obj_id)
-
-    #=========================================================================
-
-    def _update_team(self, obj_id, api_url):
-        '''
-        Updates Team from ComicVine API URL.
-
-        Returns the Team object udpated.
-        '''
-
-        # Request and Response
-        params = self.base_params
-        params['field_list'] = self.team_fields
-
-        response = requests.get(
-            api_url,
-            params=params,
-            headers=self.headers,
-        ).json()
-
-        data = self._get_object_data(response['results'])
-
-        # Update Team
-        Team.objects.filter(id=obj_id).update(
-            cvurl=data['cvurl'],
-            name=data['name'],
-            slug=slugify(data['name']),
-            desc=data['desc'],
-            image=data['image'],
-        )
-
-        return Team.objects.get(id=obj_id)
-
-    #=========================================================================
-
-    def _update_series(self, obj_id, api_url):
-        '''
-        Updates Series from ComicVine API URL.
-
-        Returns the Series object udpated.
-        '''
-
-        # Request and Response
+    def getSeriesCV(self, api_url):
         params = self.base_params
         params['field_list'] = self.series_fields
 
@@ -1097,45 +201,321 @@ class ComicImporter(object):
             headers=self.headers,
         ).json()
 
-        data = self._get_object_data(response['results'])
+        data = self.get_cv_object_data(response['results'])
 
-        if (data['year']) is not None:
-            slugy = (data['name'] + ' ' + data['year'])
-        else:
-            slugy = data['name']
+        return data
 
-        # Update Series
-        Series.objects.filter(id=obj_id).update(
-            cvurl=data['cvurl'],
-            name=data['name'],
-            slug=slugify(slugy),
-            desc=data['desc'],
-            year=data['year'],
-        )
+    def getPubisherCV(self, response_issue):
+        series_params = self.base_params
+        series_params['field_list'] = 'publisher'
 
-        return Series.objects.get(id=obj_id)
+        response_series = requests.get(
+            response_issue['results']['volume']['api_detail_url'],
+            params=series_params,
+            headers=self.headers,
+        ).json()
 
-    #=========================================================================
+        params = self.base_params
+        params['field_list'] = self.publisher_fields
 
-    def _reset_issue(self, obj_id):
-        '''
-        Resets an Issue's fields.
+        api_url = response_series['results']['publisher']['api_detail_url']
 
-        Returns the Issue object that was reset.
-        '''
-        issue = Issue.objects.get(id=obj_id)
+        response = requests.get(
+            api_url,
+            params=params,
+            headers=self.headers,
+        ).json()
 
-        issue.cvurl = ''
-        issue.name = ''
-        issue.number = IssueString('1').asString(pad=3),
-        issue.date = datetime.date.today()
-        issue.desc = ''
-        issue.arcs.clear()
-        issue.characters.clear()
-        Roles.objects.filter(issue=issue).delete()
-        issue.teams.clear()
-        issue.cover = ''
+        data = self.get_cv_object_data(response['results'])
 
-        issue.save()
+        return data
 
-        return Issue.objects.get(id=obj_id)
+    def getCVData(self, db_obj, fields, api_url):
+        params = self.base_params
+        params['field_list'] = fields
+
+        try:
+            response = requests.get(
+                api_url,
+                params=params,
+                headers=self.headers,
+            ).json()
+        except ValueError:
+            return False
+
+        data = self.get_cv_object_data(response['results'])
+
+        # Year (only exists for Series objects)
+        if data['year'] is not None:
+            db_obj.year = data['year']
+        db_obj.cvid = data['cvid']
+        db_obj.cvurl = data['cvurl']
+        db_obj.desc = data['desc']
+        db_obj.image = data['image']
+        db_obj.save()
+
+        return True
+
+    def getTeamCharactersCV(self, api_url):
+        params = self.base_params
+        params['field_list'] = self.team_fields
+
+        try:
+            response = requests.get(
+                api_url,
+                params=params,
+                headers=self.headers,
+            ).json()
+        except ValueError:
+            response = None
+
+        return response
+
+    def getComicMetadata(self, path):
+        # TODO: Need to fix the default image path
+        ca = ComicArchive(path, default_image_path=None)
+        if ca.seemsToBeAComicArchive():
+            self.logger.info(
+                "Reading in {0} {1}".format(self.read_count, path))
+            self.read_count += 1
+            if ca.hasMetadata(MetaDataStyle.CIX):
+                style = MetaDataStyle.CIX
+            elif ca.hasMetadata(MetaDataSyle.CBI):
+                style = MetaDataStyle.CBI
+            else:
+                style = None
+
+            if style is not None:
+                md = ca.readMetadata(style)
+            else:
+                # No metadata in comic. Make some guesses from filename.
+                md = ca.metadataFromFilename()
+
+            md.path = ca.path
+            md.page_count = ca.page_count
+            md.mod_ts = datetime.utcfromtimestamp(os.path.getmtime(ca.path))
+
+            return md
+        return None
+
+    def addComicFromMetadata(self, md):
+        if not md.isEmpty:
+            # Add the Publisher to the database.
+            if md.publisher is not None:
+                publisher_obj, p_create = Publisher.objects.get_or_create(
+                    name=md.publisher,
+                    slug=slugify(md.publisher),)
+
+            # Ugh, deal wih the timezone
+            current_timezone = timezone.get_current_timezone()
+            tz = timezone.make_aware(md.mod_ts, current_timezone)
+
+            # Get the issues cvid
+            # TODO: Need to clean this up a bit, but for now it works.
+            cvID = re.search('\d+]', md.notes)
+            cvID = str(cvID.group(0))
+            cvID = cvID[:-1]
+
+            # let's get the issue info from CV.
+            issue_response = self.getCVIssue(cvID)
+
+            # Get the series info from CV.
+            series_url = issue_response['results']['volume']['api_detail_url']
+            data = self.getSeriesCV(series_url)
+
+            if (data['year']) is not None:
+            	slugy = (data['name'] + ' ' + data['year'])
+	    else:
+            	slugy = data['name']
+
+            # Alright let's create the series object.
+            series_obj, s_create = Series.objects.get_or_create(
+                cvid=data['cvid'],
+                cvurl=data['cvurl'],
+                name=data['name'],
+                slug=slugify(slugy),
+                publisher=publisher_obj,
+                year=data['year'],
+                desc=data['desc'],)
+
+            if s_create:
+                self.logger.info('Added series: %s' % series_obj)
+
+            pub_date = None
+            if md.year is not None:
+                try:
+                    day = 1
+                    month = 1
+                    if md.month is not None:
+                        month = int(md.month)
+                    if md.day is not None:
+                        day = int(md.day)
+                    year = int(md.year)
+                    pub_date = datetime(year, month, day)
+                except:
+                    pass
+
+            fixed_number = IssueString(md.issue).asString(pad=3)
+
+            if pub_date is not None:
+            	slugy = series_obj.name + ' ' + fixed_number + ' ' + str(pub_date.year)
+            else:
+            	slugy = series_obj.name + ' ' + fixed_number            
+
+            issue_object, i_create = Issue.objects.get_or_create(
+                file=md.path,
+                name=str(md.title),
+                slug=slugify(slugy),
+                number=fixed_number,
+                desc=str(md.comments),
+                date=pub_date,
+                page_count=md.page_count,
+                cvurl=md.webLink,
+                cvid=cvID,
+                mod_ts=tz,
+                series=series_obj,)
+
+            # Get the issue image & short description from CV.
+            self.getIssueCV(cvID, issue_response)
+            self.logger.info("Added: %s" % issue_obj)
+
+            # Adding new publisher we need to grab
+            # some additional data from Comic Vine.
+            if p_create:
+                p = self.getPubisherCV(issue_response)
+                publisher_obj.cvid = p['cvid']
+                publisher_obj.cvurl = p['cvurl']
+                publisher_obj.desc = p['desc']
+                publisher_obj.logo = p['image']
+                publisher_obj.save()
+
+                self.logger.info('Added publisher: %s' % publisher_obj)
+
+            # Add the characters.
+            for ch in issue_response['results']['character_credits']:
+                character_obj, ch_create = Character.objects.get_or_create(
+                    name=ch['name'],
+                    slug=slugify(ch['name']),)
+                issue_obj.characters.add(character_obj)
+
+                if ch_create:
+                    res = self.getCVData(character_obj,
+                                         self.character_fields,
+                                         ch['api_detail_url'])
+                    if res:
+                        self.logger.info('Added character: %s' % character_obj)
+                    else:
+                        self.logger.info('No Character detail info available for: %s'
+                                         % character_obj)
+
+            # Add the storyarc.
+            for story_arc in issue_response['results']['story_arc_credits']:
+                story_obj, s_create = Arc.objects.get_or_create(
+                    name=story_arc['name'],
+                    slug=slugify(story_arc['name']),)
+                issue_obj.arcs.add(story_obj)
+
+                if s_create:
+                    res = self.getCVData(story_obj,
+                                         self.arc_fields,
+                                         story_arc['api_detail_url'])
+                    if res:
+                        self.logger.info('Added storyarc: %s' % story_obj)
+                    else:
+                        self.logger.info('Not Story Arc detail info available for: %s'
+                                         % story_obj)
+
+            # Add the teams
+            for team in issue_response['results']['team_credits']:
+                team_obj, t_create = Team.objects.get_or_create(
+                    name=team['name'],
+                    slug=slugify(team['name']),)
+                issue_obj.teams.add(team_obj)
+
+                # Add any existing character to the team.
+                c_response = self.getTeamCharactersCV(team['api_detail_url'])
+                if c_response is not None:
+                    for character in c_response['results']['characters']:
+                        match = Character.objects.filter(cvid=character['id'])
+                        if match:
+                            match[0].teams.add(team_obj)
+
+                if t_create:
+                    res = self.getCVData(team_obj,
+                                         self.team_fields,
+                                         team['api_detail_url'])
+                    if res:
+                        self.logger.info('Added team: %s' % team_obj)
+                    else:
+                        self.logger.info('No Team detail info available for: %s'
+                                         % team_obj)
+
+            # Add the creators
+            for p in issue_response['results']['person_credits']:
+                creator_obj, c_create = Creator.objects.get_or_create(
+                    name=p['name'],
+                    slug=slugify(p['name']),)
+
+                Roles.objects.create(creator=creator_obj,
+                                     issue=issue_obj,
+                                     roles=re.sub(' ', '', p['role']))
+
+                if c_create:
+                    res = self.getCVData(creator_obj,
+                                         self.creator_fields,
+                                         p['api_detail_url'])
+                    if res:
+                        self.logger.info('Added creator: %s' % creator_obj)
+                    else:
+                        self.logger.info('No Creator detail info available for: %s'
+                                         % creator_obj)
+
+    def commitMetadataList(self, md_list):
+        for md in md_list:
+            self.addComicFromMetadata(md)
+
+    def import_comic_files(self):
+        filelist = get_recursive_filelist(self.directory_path)
+        filelist = sorted(filelist, key=os.path.getmtime)
+
+        # Grab the entire issue table into memory
+        comics_list = Issue.objects.all()
+
+        # Remove from the database any missing or changed files
+        for comic in comics_list:
+            self.checkIfRemovedOrModified(comic, self.directory_path)
+
+        comics_list = None
+
+        # Load the issue table again to take into account any
+        # issues remove from the database
+        c_list = Issue.objects.all()
+
+        # Make a list of all path string in issue table
+        db_pathlist = []
+        for comic in c_list:
+            db_pathlist.append(comic.file)
+
+        c_list = None
+
+        # Now let's remove any existing files in the database
+        # from the directory list of files.
+        for f in db_pathlist:
+            if f in filelist:
+                filelist.remove(f)
+        db_pathlist = None
+
+        md_list = []
+        self.read_count = 0
+        for filename in filelist:
+            md = self.getComicMetadata(filename)
+            if md is not None:
+                md_list.append(md)
+
+            if self.read_count % 100 == 0 and self.read_count != 0:
+                if len(md_list) > 0:
+                    self.commitMetadataList(md_list)
+                    md_list = []
+
+        if len(md_list) > 0:
+            self.commitMetadataList(md_list)

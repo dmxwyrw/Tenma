@@ -177,6 +177,7 @@ class Issue(models.Model):
         editable=False, default=1, blank=True)
     page_count = models.PositiveSmallIntegerField(
         editable=False, default=1, blank=True)
+    mod_ts = models.DateTimeField()
 
     def __str__(self):
         return self.series.name + ' #' + str(self.number)
