@@ -159,7 +159,7 @@ class ComicImporter(object):
 
         return data
 
-    def getCVIssue(self, issue_cvid):
+    def getCVIssue(self, issue_cvid):.
         issue_params = self.base_params
         issue_params['field_list'] = self.issue_fields
 
