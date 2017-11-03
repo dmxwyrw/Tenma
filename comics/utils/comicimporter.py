@@ -471,6 +471,21 @@ class ComicImporter(object):
                         self.logger.info('No Creator detail info available for: %s'
                                          % creator_obj)
 
+            if md.storyArc is not None:
+                for s in list(set(md.storyArc.split(','))):
+                    story_obj, s_create = Arc.objects.get_or_create(
+                        name=s.strip(),)
+                    issue_obj.arcs.add(story_obj)
+                    if s_create:
+                        for story_arc in issue_response['results']['story_arc_credits']:
+                            if (story_arc['name']) == (s.strip()):
+                                data = self.getArcCV(story_arc['api_detail_url'])
+                                story_obj.cvid=data['cvid']
+                                story_obj.cvurl=data['cvurl']
+                                story_obj.desc=data['desc']
+                                story_obj.image=data['image']
+                                story_obj.save()
+
     def commitMetadataList(self, md_list):
         for md in md_list:
             self.addComicFromMetadata(md)
