@@ -324,9 +324,9 @@ class ComicImporter(object):
             data = self.getSeriesCV(series_url)
 
             if (data['year']) is not None:
-            	slugy = (data['name'] + ' ' + data['year'])
-	    else:
-            	slugy = data['name']
+                slugy = (data['name'] + ' ' + data['year'])
+            else:
+                slugy = data['name']
 
             # Alright let's create the series object.
             series_obj, s_create = Series.objects.get_or_create(
@@ -358,9 +358,10 @@ class ComicImporter(object):
             fixed_number = IssueString(md.issue).asString(pad=3)
 
             if pub_date is not None:
-            	slugy = series_obj.name + ' ' + fixed_number + ' ' + str(pub_date.year)
+                slugy = series_obj.name + ' ' + \
+                    fixed_number + ' ' + str(pub_date.year)
             else:
-            	slugy = series_obj.name + ' ' + fixed_number            
+                slugy = series_obj.name + ' ' + fixed_number
 
             issue_object, i_create = Issue.objects.get_or_create(
                 file=md.path,
