@@ -363,7 +363,7 @@ class ComicImporter(object):
             else:
                 slugy = series_obj.name + ' ' + fixed_number
 
-            issue_object, i_create = Issue.objects.get_or_create(
+            issue_obj, i_create = Issue.objects.get_or_create(
                 file=md.path,
                 name=str(md.title),
                 slug=slugify(slugy),
