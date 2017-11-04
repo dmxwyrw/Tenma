@@ -43,6 +43,7 @@ ROLE_CHOICES = (
     ('penciler', 'Penciler'),
     ('production', 'Production'),
     ('writer', 'Writer'),
+    ('penciller', 'Penciller'),
 )
 
 
