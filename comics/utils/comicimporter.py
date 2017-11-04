@@ -159,7 +159,7 @@ class ComicImporter(object):
 
         return data
 
-    def getCVIssue(self, issue_cvid):.
+    def getCVIssue(self, issue_cvid):
         issue_params = self.base_params
         issue_params['field_list'] = self.issue_fields
 
@@ -519,13 +519,9 @@ class ComicImporter(object):
                     if s_create:
                         for story_arc in issue_response['results']['story_arc_credits']:
                             if (story_arc['name']) == (s.strip()):
-                                data = self.getArcCV(
-                                    story_arc['api_detail_url'])
-                                story_obj.cvid = data['cvid']
-                                story_obj.cvurl = data['cvurl']
-                                story_obj.desc = data['desc']
-                                story_obj.image = data['image']
-                                story_obj.save()
+                                self.getCVData(story_obj,
+                                               self.arc_fields,
+                                               story_arc['api_detail_url'])
 
                                 self.logger.info(
                                     'Added storyarc: %s' % story_obj)
@@ -538,12 +534,9 @@ class ComicImporter(object):
                     if t_create:
                         for team in issue_response['results']['team_credits']:
                             if (team['name']) == (t.strip()):
-                                data = self.getTeamCV(team['api_detail_url'])
-                                team_obj.cvid = data['cvid']
-                                team_obj.cvurl = data['cvurl']
-                                team_obj.desc = data['desc']
-                                team_obj.image = data['image']
-                                team_obj.save()
+                                self.getCVData(team_obj,
+                                               self.team_fields,
+                                               team['api_detail_url'])
 
                                 self.logger.info(
                                     'Added team: %s' % team_obj)
@@ -551,9 +544,11 @@ class ComicImporter(object):
                     # Add any existing character to the team.
                     for team in issue_response['results']['team_credits']:
                         if (team['name']) == (t.strip()):
-                            c_response = self.getTeamCharactersCV(team['api_detail_url'])
+                            c_response = self.getTeamCharactersCV(
+                                team['api_detail_url'])
                             for character in c_response['results']['characters']:
-                                match = Character.objects.filter(cvid=character['id'])
+                                match = Character.objects.filter(
+                                    cvid=character['id'])
                                 if match:
                                     match[0].teams.add(team_obj)
 
@@ -574,12 +569,9 @@ class ComicImporter(object):
                     if c_create:
                         for p in issue_response['results']['person_credits']:
                             if (p['name']) == (person):
-                                data = self.getCreatorCV(p['api_detail_url'])
-                                creator_obj.cvid = data['cvid']
-                                creator_obj.cvurl = data['cvurl']
-                                creator_obj.desc = data['desc']
-                                creator_obj.image = data['image']
-                                creator_obj.save()
+                                self.getCVData(creator_obj,
+                                               self.creator_fields,
+                                               p['api_detail_url'])
 
                                 self.logger.info(
                                     'Added creator: %s' % creator_obj)
