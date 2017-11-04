@@ -285,6 +285,32 @@ class ComicImporter(object):
 
         return data
 
+    def getTeamCV(self, api_url):
+        params = self.base_params
+        params['field_list'] = self.team_fields
+
+        response = requests.get(
+            api_url,
+            params=params,
+            headers=self.headers,
+        ).json()
+
+        data = self.get_cv_object_data(response['results'])
+
+        return data
+
+    def getTeamCharactersCV(self, api_url):
+        params = self.base_params
+        params['field_list'] = self.team_fields
+
+        response = requests.get(
+            api_url,
+            params=params,
+            headers=self.headers,
+        ).json()
+
+        return response
+
     def getComicMetadata(self, path):
         # TODO: Need to fix the default image path
         ca = ComicArchive(path, default_image_path=None)
@@ -503,6 +529,33 @@ class ComicImporter(object):
 
                                 self.logger.info(
                                     'Added storyarc: %s' % story_obj)
+
+            if md.teams is not None:
+                for t in list(set(md.teams.split(','))):
+                    team_obj, t_create = Team.objects.get_or_create(
+                        name=t.strip(),)
+                    issue_obj.teams.add(team_obj)
+                    if t_create:
+                        for team in issue_response['results']['team_credits']:
+                            if (team['name']) == (t.strip()):
+                                data = self.getTeamCV(team['api_detail_url'])
+                                team_obj.cvid = data['cvid']
+                                team_obj.cvurl = data['cvurl']
+                                team_obj.desc = data['desc']
+                                team_obj.image = data['image']
+                                team_obj.save()
+
+                                self.logger.info(
+                                    'Added team: %s' % team_obj)
+
+                    # Add any existing character to the team.
+                    for team in issue_response['results']['team_credits']:
+                        if (team['name']) == (t.strip()):
+                            c_response = self.getTeamCharactersCV(team['api_detail_url'])
+                            for character in c_response['results']['characters']:
+                                match = Character.objects.filter(cvid=character['id'])
+                                if match:
+                                    match[0].teams.add(team_obj)
 
             if md.credits is not None:
                 for credit in md.credits:
