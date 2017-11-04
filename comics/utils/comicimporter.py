@@ -271,6 +271,20 @@ class ComicImporter(object):
 
         return response
 
+    def getCreatorCV(self, api_url):
+        params = self.base_params
+        params['field_list'] = self.creator_fields
+
+        response = requests.get(
+            api_url,
+            params=params,
+            headers=self.headers,
+        ).json()
+
+        data = self.get_cv_object_data(response['results'])
+
+        return data
+
     def getComicMetadata(self, path):
         # TODO: Need to fix the default image path
         ca = ComicArchive(path, default_image_path=None)
@@ -485,6 +499,32 @@ class ComicImporter(object):
                                 story_obj.desc=data['desc']
                                 story_obj.image=data['image']
                                 story_obj.save()
+                                self.logger.info('Added storyarc: %s' % s)
+
+            if md.credits is not None:
+                for credit in md.credits:
+                    role = credit['role'].lower()
+                    person = credit['person']
+
+                    creator_obj, c_create = Creator.objects.get_or_create(
+                        name=person,)
+
+                    Roles.objects.create(
+                        creator=creator_obj,
+                        issue=issue_obj,
+                        roles=role,
+                    )
+
+                    if c_create:
+                        for p in issue_response['results']['person_credits']:
+                            if (p['name']) == (person):
+                                data = self.getCreatorCV(p['api_detail_url'])
+                                creator_obj.cvid=data['cvid']
+                                creator_obj.cvurl=data['cvurl']
+                                creator_obj.desc=data['desc']
+                                creator_obj.image=data['image']
+                                creator_obj.save()
+                                self.logger.info('Add: %s' % person)
 
     def commitMetadataList(self, md_list):
         for md in md_list:
