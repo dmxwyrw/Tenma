@@ -493,13 +493,16 @@ class ComicImporter(object):
                     if s_create:
                         for story_arc in issue_response['results']['story_arc_credits']:
                             if (story_arc['name']) == (s.strip()):
-                                data = self.getArcCV(story_arc['api_detail_url'])
-                                story_obj.cvid=data['cvid']
-                                story_obj.cvurl=data['cvurl']
-                                story_obj.desc=data['desc']
-                                story_obj.image=data['image']
+                                data = self.getArcCV(
+                                    story_arc['api_detail_url'])
+                                story_obj.cvid = data['cvid']
+                                story_obj.cvurl = data['cvurl']
+                                story_obj.desc = data['desc']
+                                story_obj.image = data['image']
                                 story_obj.save()
-                                self.logger.info('Added storyarc: %s' % s)
+
+                                self.logger.info(
+                                    'Added storyarc: %s' % story_obj)
 
             if md.credits is not None:
                 for credit in md.credits:
@@ -519,12 +522,14 @@ class ComicImporter(object):
                         for p in issue_response['results']['person_credits']:
                             if (p['name']) == (person):
                                 data = self.getCreatorCV(p['api_detail_url'])
-                                creator_obj.cvid=data['cvid']
-                                creator_obj.cvurl=data['cvurl']
-                                creator_obj.desc=data['desc']
-                                creator_obj.image=data['image']
+                                creator_obj.cvid = data['cvid']
+                                creator_obj.cvurl = data['cvurl']
+                                creator_obj.desc = data['desc']
+                                creator_obj.image = data['image']
                                 creator_obj.save()
-                                self.logger.info('Add: %s' % person)
+
+                                self.logger.info(
+                                    'Added creator: %s' % creator_obj)
 
     def commitMetadataList(self, md_list):
         for md in md_list:
