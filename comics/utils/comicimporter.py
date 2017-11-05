@@ -403,6 +403,24 @@ class ComicImporter(object):
             else:
                 slugy = series_obj.name + ' ' + fixed_number
 
+            # let's get the issue info from CV.
+            issue_response = self.getCVIssue(cvID)
+
+            # Add the series info from CV.
+            series_url = issue_response['results']['volume']['api_detail_url']
+            data = self.getSeriesCV(series_url)
+            series_obj, s_create = Series.objects.get_or_create(
+                cvid=data['cvid'],
+                cvurl=data['cvurl'],
+                name=data['name'],
+                publisher=publisher_obj,
+                year=data['year'],
+                desc=data['desc'],)
+
+            if s_create:
+                self.logger.info('Added series: %s' % series_obj)
+
+            # Create the issue
             issue_obj, i_create = Issue.objects.get_or_create(
                 file=md.path,
                 name=str(md.title),
