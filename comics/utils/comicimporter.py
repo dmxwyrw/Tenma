@@ -303,11 +303,14 @@ class ComicImporter(object):
         params = self.base_params
         params['field_list'] = self.team_fields
 
-        response = requests.get(
-            api_url,
-            params=params,
-            headers=self.headers,
-        ).json()
+        try:
+            response = requests.get(
+                api_url,
+                params=params,
+                headers=self.headers,
+            ).json()
+        except ValueError:
+            response = None
 
         return response
 
