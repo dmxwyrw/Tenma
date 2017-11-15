@@ -13,7 +13,7 @@ def add_slug_data(apps, schema_editor):
     query = Issue.objects.all()
     for issue in query:
         if issue.date is not None:
-            slugy = issue.series + ' ' + \
+            slugy = issue.series.name + ' ' + \
                 issue.number + ' ' + str(issue.date.year)
         else:
             slugy = issue.series + ' ' + issue.number

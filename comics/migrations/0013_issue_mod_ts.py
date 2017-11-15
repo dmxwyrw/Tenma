@@ -9,7 +9,7 @@ import django.utils.timezone
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('comics', '0004_issue_page_count'),
+        ('comics', '0012_issue_slug'),
     ]
 
     operations = [
