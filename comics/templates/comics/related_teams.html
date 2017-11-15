@@ -17,7 +17,7 @@
 						{% endif %}
 					</div>
 				</a>
-				<a href="{% url 'comics:team' team.id %}"><p>{{ team.name }}</p></a>
+				<a href="{% url 'comics:team' team.slug %}"><p>{{ team.name }}</p></a>
 			</li>
 			{% endfor %}
 		</ul>
