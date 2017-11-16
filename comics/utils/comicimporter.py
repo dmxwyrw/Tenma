@@ -349,10 +349,6 @@ class ComicImporter(object):
                     name=md.publisher,
                     slug=slugify(md.publisher),)
 
-            # Ugh, deal wih the timezone
-            current_timezone = timezone.get_current_timezone()
-            tz = timezone.make_aware(md.mod_ts, current_timezone)
-
             # Get the issues cvid
             # TODO: Need to clean this up a bit, but for now it works.
             cvID = re.search('\d+]', md.notes)
@@ -384,6 +380,10 @@ class ComicImporter(object):
             if s_create:
                 self.logger.info('Added series: %s' % series_obj)
 
+            # Ugh, deal wih the timezone
+            current_timezone = timezone.get_current_timezone()
+            tz = timezone.make_aware(md.mod_ts, current_timezone)
+
             pub_date = None
             if md.year is not None:
                 try:
@@ -405,23 +405,6 @@ class ComicImporter(object):
                     fixed_number + ' ' + str(pub_date.year)
             else:
                 slugy = series_obj.name + ' ' + fixed_number
-
-            # let's get the issue info from CV.
-            issue_response = self.getCVIssue(cvID)
-
-            # Add the series info from CV.
-            series_url = issue_response['results']['volume']['api_detail_url']
-            data = self.getSeriesCV(series_url)
-            series_obj, s_create = Series.objects.get_or_create(
-                cvid=data['cvid'],
-                cvurl=data['cvurl'],
-                name=data['name'],
-                publisher=publisher_obj,
-                year=data['year'],
-                desc=data['desc'],)
-
-            if s_create:
-                self.logger.info('Added series: %s' % series_obj)
 
             # Create the issue
             issue_obj, i_create = Issue.objects.get_or_create(
@@ -531,71 +514,6 @@ class ComicImporter(object):
                     else:
                         self.logger.info('No Creator detail info available for: %s'
                                          % creator_obj)
-
-            if md.storyArc is not None:
-                for s in list(set(md.storyArc.split(','))):
-                    story_obj, s_create = Arc.objects.get_or_create(
-                        name=s.strip(),)
-                    issue_obj.arcs.add(story_obj)
-                    if s_create:
-                        for story_arc in issue_response['results']['story_arc_credits']:
-                            if (story_arc['name']) == (s.strip()):
-                                self.getCVData(story_obj,
-                                               self.arc_fields,
-                                               story_arc['api_detail_url'])
-
-                                self.logger.info(
-                                    'Added storyarc: %s' % story_obj)
-
-            if md.teams is not None:
-                for t in list(set(md.teams.split(','))):
-                    team_obj, t_create = Team.objects.get_or_create(
-                        name=t.strip(),)
-                    issue_obj.teams.add(team_obj)
-                    if t_create:
-                        for team in issue_response['results']['team_credits']:
-                            if (team['name']) == (t.strip()):
-                                self.getCVData(team_obj,
-                                               self.team_fields,
-                                               team['api_detail_url'])
-
-                                self.logger.info(
-                                    'Added team: %s' % team_obj)
-
-                    # Add any existing character to the team.
-                    for team in issue_response['results']['team_credits']:
-                        if (team['name']) == (t.strip()):
-                            c_response = self.getTeamCharactersCV(
-                                team['api_detail_url'])
-                            for character in c_response['results']['characters']:
-                                match = Character.objects.filter(
-                                    cvid=character['id'])
-                                if match:
-                                    match[0].teams.add(team_obj)
-
-            if md.credits is not None:
-                for credit in md.credits:
-                    role = credit['role'].lower()
-                    person = credit['person']
-
-                    creator_obj, c_create = Creator.objects.get_or_create(
-                        name=person,)
-
-                    Roles.objects.create(
-                        creator=creator_obj,
-                        issue=issue_obj,
-                        roles=role,
-                    )
-
-                    if c_create:
-                        for p in issue_response['results']['person_credits']:
-                            if (p['name']) == (person):
-                                self.getCVData(creator_obj,
-                                               self.creator_fields,
-                                               p['api_detail_url'])
-
-                                self.logger.info(
-                                    'Added creator: %s' % creator_obj)
 
     def commitMetadataList(self, md_list):
         for md in md_list:
