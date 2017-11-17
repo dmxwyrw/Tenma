@@ -248,7 +248,7 @@ class ComicImporter(object):
         # Year (only exists for Series objects)
         if data['year'] is not None:
             db_obj.year = data['year']
-        db_obj.cvid = data['cvid']
+        db_obj.cvid = int(data['cvid'])
         db_obj.cvurl = data['cvurl']
         db_obj.desc = data['desc']
         db_obj.image = data['image']
@@ -354,7 +354,7 @@ class ComicImporter(object):
 
             # Alright let's create the series object.
             series_obj, s_create = Series.objects.get_or_create(
-                cvid=data['cvid'],
+                cvid=int(data['cvid']),
                 cvurl=data['cvurl'],
                 name=data['name'],
                 publisher=publisher_obj,
@@ -414,7 +414,7 @@ class ComicImporter(object):
                 date=pub_date,
                 page_count=md.page_count,
                 cvurl=md.webLink,
-                cvid=cvID,
+                cvid=int(cvID),
                 mod_ts=tz,
                 series=series_obj,)
 
@@ -426,7 +426,7 @@ class ComicImporter(object):
             # some additional data from Comic Vine.
             if p_create:
                 p = self.getPubisherCV(issue_response)
-                publisher_obj.cvid = p['cvid']
+                publisher_obj.cvid = int(p['cvid'])
                 publisher_obj.cvurl = p['cvurl']
                 publisher_obj.desc = p['desc']
                 publisher_obj.logo = p['image']

@@ -46,6 +46,7 @@ class Migration(migrations.Migration):
             model_name='creator',
             name='slug',
             field=models.SlugField(
-                max_length=SLUG_LENGTH),
+                max_length=SLUG_LENGTH,
+                unique=True),
         ),
     ]

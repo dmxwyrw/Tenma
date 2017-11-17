@@ -57,7 +57,7 @@ class Settings(SingletonModel):
 
 
 class Arc(models.Model):
-    cvid = models.CharField(max_length=15)
+    cvid = models.PositiveIntegerField(null=True)
     cvurl = models.URLField(max_length=200)
     name = models.CharField('Arc name', max_length=200)
     slug = models.SlugField(max_length=200, unique=True)
@@ -70,7 +70,7 @@ class Arc(models.Model):
 
 
 class Team(models.Model):
-    cvid = models.CharField(max_length=15)
+    cvid = models.PositiveIntegerField(null=True)
     cvurl = models.URLField(max_length=200)
     name = models.CharField('Team name', max_length=200)
     slug = models.SlugField(max_length=200, unique=True)
@@ -83,7 +83,7 @@ class Team(models.Model):
 
 
 class Character(models.Model):
-    cvid = models.CharField(max_length=15)
+    cvid = models.PositiveIntegerField(null=True)
     cvurl = models.URLField(max_length=200)
     name = models.CharField('Character name', max_length=200)
     slug = models.SlugField(max_length=200, unique=True)
@@ -97,7 +97,7 @@ class Character(models.Model):
 
 
 class Creator(models.Model):
-    cvid = models.CharField(max_length=15)
+    cvid = models.PositiveIntegerField(null=True)
     cvurl = models.URLField(max_length=200)
     name = models.CharField('Creator name', max_length=200)
     slug = models.SlugField(max_length=200, unique=True)
@@ -110,7 +110,7 @@ class Creator(models.Model):
 
 
 class Publisher(models.Model):
-    cvid = models.CharField(max_length=15)
+    cvid = models.PositiveIntegerField(null=True)
     cvurl = models.URLField(max_length=200)
     name = models.CharField('Series name', max_length=200)
     slug = models.SlugField(max_length=200, unique=True)
@@ -123,7 +123,7 @@ class Publisher(models.Model):
 
 
 class Series(models.Model):
-    cvid = models.CharField(max_length=15, blank=True)
+    cvid = models.PositiveIntegerField(unique=True)
     cvurl = models.URLField(max_length=200, blank=True)
     name = models.CharField('Series name', max_length=200)
     slug = models.SlugField(max_length=200, unique=True)
@@ -150,7 +150,7 @@ class Series(models.Model):
 
 
 class Issue(models.Model):
-    cvid = models.CharField('ComicVine ID', max_length=15, blank=True)
+    cvid = models.PositiveIntegerField('ComicVine ID', unique=True)
     cvurl = models.URLField(max_length=200, blank=True)
     series = models.ForeignKey(Series, on_delete=models.CASCADE, blank=True)
     name = models.CharField('Issue name', max_length=200, blank=True)
