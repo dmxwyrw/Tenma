@@ -17,4 +17,8 @@ celerybeat-schedule.db
 ehthumbs.db
 Thumbs.db
 
+# Temp files
 *~
+# Eclipse project files
+.project
+.pydevproject
