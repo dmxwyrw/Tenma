@@ -3,7 +3,9 @@ from django.shortcuts import get_object_or_404, render
 from django.views.generic import ListView, DetailView
 from django.views.generic.edit import UpdateView, DeleteView
 
-from .models import Series, Issue, Character, Arc, Team, Publisher, Creator, Settings, Roles
+from .models import (Series, Issue, Character, Arc,
+                     Team, Publisher, Creator, Settings,
+                     Roles)
 from .tasks import import_comic_files_task, reprocess_issue_task
 
 
