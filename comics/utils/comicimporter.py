@@ -357,12 +357,25 @@ class ComicImporter(object):
                 cvid=data['cvid'],
                 cvurl=data['cvurl'],
                 name=data['name'],
-                slug=slugify(slugy),
                 publisher=publisher_obj,
                 year=data['year'],
                 desc=data['desc'],)
 
             if s_create:
+                if (data['year']) is not None:
+                    exist_count = Series.objects.filter(
+                        name=data['name'], year=data['year']).count()
+                else:
+                    exist_count = Series.objects.filter(
+                        name=data['name']).count()
+                if exist_count > 1:
+                    # Ok, let's drop the count by one since we're including the
+                    # new series in the count.
+                    exist_count = exist_count - 1
+                    slugy = slugy + ' ' + str(exist_count)
+
+                series_obj.slug = slugify(slugy)
+                series_obj.save()
                 self.logger.info('Added series: %s' % series_obj)
 
             # Ugh, deal wih the timezone
