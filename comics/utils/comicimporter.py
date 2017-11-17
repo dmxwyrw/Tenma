@@ -299,21 +299,6 @@ class ComicImporter(object):
 
         return data
 
-    def getTeamCharactersCV(self, api_url):
-        params = self.base_params
-        params['field_list'] = self.team_fields
-
-        try:
-            response = requests.get(
-                api_url,
-                params=params,
-                headers=self.headers,
-            ).json()
-        except ValueError:
-            response = None
-
-        return response
-
     def getComicMetadata(self, path):
         # TODO: Need to fix the default image path
         ca = ComicArchive(path, default_image_path=None)
