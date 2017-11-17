@@ -1,19 +1,12 @@
 from __future__ import unicode_literals
 
 import datetime
-import os
-import rarfile
-import zipfile
-import tarfile
 
-from shutil import copyfile
-from multiselectfield import MultiSelectField
-
-from django.db import models
-from solo.models import SingletonModel
-from django.utils import timezone
-from django.conf import settings
+from django.core.urlresolvers import reverse
 from django.core.validators import RegexValidator
+from django.db import models
+from multiselectfield import MultiSelectField
+from solo.models import SingletonModel
 
 from .utils.comicfilehandler import ComicFileHandler
 
