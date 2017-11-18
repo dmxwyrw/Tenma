@@ -2,7 +2,7 @@ from django.conf.urls import url
 from django.conf import settings
 from django.conf.urls.static import static
 from comics.views import SeriesDetail, IssueDetail, CharacterDetail, ArcDetail, \
-    TeamDetail, PublisherDetail, CreatorView, IssueUpdateView, IssueDeleteView, \
+    TeamDetail, PublisherDetail, CreatorDetail, IssueUpdateView, IssueDeleteView, \
     ServerSettingsView, read, importer, reprocess, update_issue_status
 
 from . import views
@@ -21,7 +21,7 @@ urlpatterns = [
     url(r'^team/(?P<slug>[\w\-]+)/$', TeamDetail.as_view(), name='team'),
     url(r'^publisher/(?P<slug>[\w\-]+)/$',
         PublisherDetail.as_view(), name='publisher'),
-    url(r'^creator/(?P<slug>[\w\-]+)/$', CreatorView.as_view(), name='creator'),
+    url(r'^creator/(?P<slug>[\w\-]+)/$', CreatorDetail.as_view(), name='creator'),
     url('importer', importer, name='importer'),
     url(r'^issue/(?P<slug>[\w\-]+)/update/$',
         IssueUpdateView.as_view(), name='issue-update'),

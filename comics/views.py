@@ -74,12 +74,12 @@ class PublisherDetail(DetailView):
     template_name = 'comics/publisher_detail.html'
 
 
-class CreatorView(DetailView):
+class CreatorDetail(DetailView):
     model = Creator
-    template_name = 'comics/creator.html'
+    template_name = 'comics/creator_detail.html'
 
     def get_context_data(self, **kwargs):
-        context = super(CreatorView, self).get_context_data(**kwargs)
+        context = super(CreatorDetail, self).get_context_data(**kwargs)
         creator = self.get_object()
         roles = Roles.objects.filter(creator=creator)
         context['issue_list'] = Issue.objects.filter(
