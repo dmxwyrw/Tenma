@@ -7,7 +7,7 @@ from comics.views import SeriesList, SeriesDetail, IssueDetail, CharacterDetail,
 
 app_name = 'comics'
 urlpatterns = [
-    url(r'^$', SeriesList.as_view(), name='index'),
+    url(r'^$', SeriesList.as_view(), name='comics_series_list'),
     url(r'^series/(?P<slug>[\w\-]+)/$', SeriesDetail.as_view(), name='series'),
     url(r'^issue/(?P<slug>[\w\-]+)/$', IssueDetail.as_view(), name='issue'),
     url(r'^issue/(?P<slug>[\w\-]+)/read$', read, name='read'),

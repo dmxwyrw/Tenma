@@ -147,6 +147,7 @@ class Series(models.Model):
 
     class Meta:
         verbose_name_plural = "Series"
+        ordering = ["name"]
 
 
 class Issue(models.Model):

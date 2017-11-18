@@ -10,21 +10,16 @@ from .tasks import import_comic_files_task, reprocess_issue_task
 
 
 class SeriesList(ListView):
-    template_name = 'comics/series_list.html'
+    model = Series
     context_object_name = 'all_series'
-
-    def get_queryset(self):
-        return Series.objects.order_by('name')
 
 
 class SeriesDetail(DetailView):
     model = Series
-    template_name = 'comics/series_detail.html'
 
 
 class IssueDetail(DetailView):
     model = Issue
-    template_name = 'comics/issue_detail.html'
 
     def get_context_data(self, **kwargs):
         context = super(IssueDetail, self).get_context_data(**kwargs)
@@ -35,7 +30,6 @@ class IssueDetail(DetailView):
 
 class CharacterDetail(DetailView):
     model = Character
-    template_name = 'comics/character_detail.html'
 
     def get_context_data(self, **kwargs):
         context = super(CharacterDetail, self).get_context_data(**kwargs)
@@ -47,7 +41,6 @@ class CharacterDetail(DetailView):
 
 class ArcDetail(DetailView):
     model = Arc
-    template_name = 'comics/arc_detail.html'
 
     def get_context_data(self, **kwargs):
         context = super(ArcDetail, self).get_context_data(**kwargs)
@@ -59,7 +52,6 @@ class ArcDetail(DetailView):
 
 class TeamDetail(DetailView):
     model = Team
-    template_name = 'comics/team_detail.html'
 
     def get_context_data(self, **kwargs):
         context = super(TeamDetail, self).get_context_data(**kwargs)
@@ -71,12 +63,10 @@ class TeamDetail(DetailView):
 
 class PublisherDetail(DetailView):
     model = Publisher
-    template_name = 'comics/publisher_detail.html'
 
 
 class CreatorDetail(DetailView):
     model = Creator
-    template_name = 'comics/creator_detail.html'
 
     def get_context_data(self, **kwargs):
         context = super(CreatorDetail, self).get_context_data(**kwargs)
