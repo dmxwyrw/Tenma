@@ -45,12 +45,12 @@ class CharacterDetail(DetailView):
         return context
 
 
-class ArcView(DetailView):
+class ArcDetail(DetailView):
     model = Arc
-    template_name = 'comics/arc.html'
+    template_name = 'comics/arc_detail.html'
 
     def get_context_data(self, **kwargs):
-        context = super(ArcView, self).get_context_data(**kwargs)
+        context = super(ArcDetail, self).get_context_data(**kwargs)
         arc = self.get_object()
         context['issue_list'] = arc.issue_set.all(
         ).order_by('series__name', 'number')
