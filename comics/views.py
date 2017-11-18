@@ -9,8 +9,8 @@ from .models import (Series, Issue, Character, Arc,
 from .tasks import import_comic_files_task, reprocess_issue_task
 
 
-class IndexView(ListView):
-    template_name = 'comics/index.html'
+class SeriesList(ListView):
+    template_name = 'comics/series_list.html'
     context_object_name = 'all_series'
 
     def get_queryset(self):

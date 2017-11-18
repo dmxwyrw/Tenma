@@ -1,15 +1,13 @@
 from django.conf.urls import url
 from django.conf import settings
 from django.conf.urls.static import static
-from comics.views import SeriesDetail, IssueDetail, CharacterDetail, ArcDetail, \
+from comics.views import SeriesList, SeriesDetail, IssueDetail, CharacterDetail, ArcDetail, \
     TeamDetail, PublisherDetail, CreatorDetail, IssueUpdateView, IssueDeleteView, \
     ServerSettingsView, read, importer, reprocess, update_issue_status
 
-from . import views
-
 app_name = 'comics'
 urlpatterns = [
-    url(r'^$', views.IndexView.as_view(), name='index'),
+    url(r'^$', SeriesList.as_view(), name='index'),
     url(r'^series/(?P<slug>[\w\-]+)/$', SeriesDetail.as_view(), name='series'),
     url(r'^issue/(?P<slug>[\w\-]+)/$', IssueDetail.as_view(), name='issue'),
     url(r'^issue/(?P<slug>[\w\-]+)/read$', read, name='read'),
