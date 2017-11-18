@@ -11,7 +11,6 @@ from .tasks import import_comic_files_task, reprocess_issue_task
 
 class SeriesList(ListView):
     model = Series
-    context_object_name = 'all_series'
 
 
 class SeriesDetail(DetailView):

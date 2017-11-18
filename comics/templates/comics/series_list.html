@@ -12,9 +12,9 @@
 </div>
 
 <div class="all-series">
-{% if all_series %}
+{% if series_list %}
 	<ul>
-		{% for series in all_series %}
+		{% for series in series_list %}
 			{% if series.issue_set.all %}
 			<li>
 				<a href="{% url 'comics:series' series.slug %}">
