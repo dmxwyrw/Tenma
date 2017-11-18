@@ -33,12 +33,12 @@ class IssueDetail(DetailView):
         return context
 
 
-class CharacterView(DetailView):
+class CharacterDetail(DetailView):
     model = Character
-    template_name = 'comics/character.html'
+    template_name = 'comics/character_detail.html'
 
     def get_context_data(self, **kwargs):
-        context = super(CharacterView, self).get_context_data(**kwargs)
+        context = super(CharacterDetail, self).get_context_data(**kwargs)
         character = self.get_object()
         context['issue_list'] = character.issue_set.all(
         ).order_by('series__name', 'number')
