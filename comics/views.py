@@ -17,17 +17,17 @@ class IndexView(ListView):
         return Series.objects.order_by('name')
 
 
-class SeriesView(DetailView):
+class SeriesDetail(DetailView):
     model = Series
-    template_name = 'comics/series.html'
+    template_name = 'comics/series_detail.html'
 
 
-class IssueView(DetailView):
+class IssueDetail(DetailView):
     model = Issue
-    template_name = 'comics/issue.html'
+    template_name = 'comics/issue_detail.html'
 
     def get_context_data(self, **kwargs):
-        context = super(IssueView, self).get_context_data(**kwargs)
+        context = super(IssueDetail, self).get_context_data(**kwargs)
         issue = self.get_object()
         context['roles_list'] = Roles.objects.filter(issue=issue)
         return context
@@ -69,9 +69,9 @@ class TeamView(DetailView):
         return context
 
 
-class PublisherView(DetailView):
+class PublisherDetail(DetailView):
     model = Publisher
-    template_name = 'comics/publisher.html'
+    template_name = 'comics/publisher_detail.html'
 
 
 class CreatorView(DetailView):
