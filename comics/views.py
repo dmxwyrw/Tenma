@@ -57,12 +57,12 @@ class ArcDetail(DetailView):
         return context
 
 
-class TeamView(DetailView):
+class TeamDetail(DetailView):
     model = Team
-    template_name = 'comics/team.html'
+    template_name = 'comics/team_detail.html'
 
     def get_context_data(self, **kwargs):
-        context = super(TeamView, self).get_context_data(**kwargs)
+        context = super(TeamDetail, self).get_context_data(**kwargs)
         team = self.get_object()
         context['issue_list'] = team.issue_set.all(
         ).order_by('series__name', 'number')
