@@ -22,7 +22,7 @@ class ComicFileHandler(object):
 
         Returns a dictionary containing the mediaurl and a list of files.
         '''
-        ca = ComicArchive(self.file, default_image_path=None)
+        ca = ComicArchive(self.file)
         filename = os.path.basename(self.file)
         mediaroot = settings.MEDIA_ROOT + '/temp/'
         mediaurl = settings.MEDIA_URL + 'temp/' + str(cvid) + '/'
@@ -91,7 +91,7 @@ class ComicFileHandler(object):
         cover = ''
 
         # File validation
-        if utils.valid_comic_file(filename):
+        if ca.seemsToBeAComicArchive():
             # Copy file to temp directory
             copyfile(self.file, tempfile)
             os.chmod(tempfile, 0o777)
@@ -146,7 +146,7 @@ class ComicFileHandler(object):
         tempfile = mediaroot + filename
 
         # File validation
-        if utils.valid_comic_file(filename):
+        if ca.seemsToBeAComicArchive():
             # Copy file to temp directory
             copyfile(self.file, tempfile)
             os.chmod(tempfile, 0o777)
@@ -236,13 +236,11 @@ class ComicFileHandler(object):
     def normalise_comic_extension(self, comic_file):
         ''' Set correct extension if necessary '''
 
-        ext = os.path.splitext(comic_file)[1].lower()
+        ca = ComicArchive(comic_file)
         c = comic_file
-        if ext == '.cbz':
+        if ca.isZip():
             c = c.replace('.cbz', '.zip')
-        elif ext == '.cbt':
-            c = c.replace('.cbt', '.tar')
-        os.rename(comic_file, c)
+            os.rename(comic_file, c)
 
         return c
 
