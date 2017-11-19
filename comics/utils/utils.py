@@ -224,20 +224,6 @@ def optimize_image(image_path, output_quality, base_width):
 
 
 #==============================================================================
-def valid_comic_file(comic_file):
-    ''' Checks for valid comic file '''
-
-    ext = os.path.splitext(comic_file)[1].lower()
-
-    if ext == '.cbr' or ext == '.rar' or \
-       ext == '.cbz' or ext == '.zip' or \
-       ext == '.cbt' or ext == '.tar' or \
-       ext == '.pdf':
-        return True
-    else:
-        return False
-
-    # ==============================================================================
 
 
 def valid_image_file(image_file):
