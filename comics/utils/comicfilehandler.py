@@ -46,11 +46,7 @@ class ComicFileHandler(object):
                 os.chmod(tempfile, 0o777)
 
             if ca.isZip():
-                # Change extension if needed
-                comic_file = self.normalise_comic_extension(tempfile)
-
-                # Get extractor
-                extractor = self.get_extractor(comic_file)
+                extractor = self.get_extractor(tempfile)
                 extractor.extractall(path=temppath)
                 extractor.close()
             elif ca.isPdf():
@@ -62,8 +58,6 @@ class ComicFileHandler(object):
             # Delete the file after extraction so that space isn't wasted.
             if os.path.isfile(tempfile):
                 os.remove(tempfile)
-            elif os.path.isfile(comic_file):
-                os.remove(comic_file)
 
             # Get a list of pages
             pages = self._get_file_list(temppath)
@@ -98,11 +92,8 @@ class ComicFileHandler(object):
             os.chmod(tempfile, 0o777)
 
             if ca.isZip():
-                # Change extension if needed
-                comic_file = self.normalise_comic_extension(tempfile)
-
                 # Get extractor
-                extractor = self.get_extractor(comic_file)
+                extractor = self.get_extractor(tempfile)
 
                 # Get cover file name
                 first_image = self._get_first_image(extractor.namelist())
@@ -132,8 +123,6 @@ class ComicFileHandler(object):
             # Delete the temp comic file
             if os.path.isfile(tempfile):
                 os.remove(tempfile)
-            elif os.path.isfile(comic_file):
-                os.remove(comic_file)
 
         return cover
 
@@ -233,19 +222,6 @@ class ComicFileHandler(object):
         path_normalise = re.compile(r"[/\\]{1,}")
         filename = path_normalise.sub("`", filepath).split('`')[-1]
         return filename
-
-    #=========================================================================
-
-    def normalise_comic_extension(self, comic_file):
-        ''' Set correct extension if necessary '''
-
-        ca = ComicArchive(comic_file)
-        c = comic_file
-        if ca.isZip():
-            c = c.replace('.cbz', '.zip')
-            os.rename(comic_file, c)
-
-        return c
 
     #=========================================================================
 
