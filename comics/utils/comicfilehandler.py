@@ -8,7 +8,7 @@ class ComicFileHandler(object):
 
 	#==================================================================================================
 
-	def extract_comic(self, file, id):
+	def extract_comic(self, file, cvid):
 		'''
 		Extract all the pages from a comic book file.
 
@@ -17,8 +17,8 @@ class ComicFileHandler(object):
 		filename = os.path.basename(file)
 		ext = os.path.splitext(filename)[1].lower()
 		mediaroot = settings.MEDIA_ROOT + '/temp/'
-		mediaurl = settings.MEDIA_URL + 'temp/' + str(id) + '/'
-		temppath = mediaroot + str(id)
+		mediaurl = settings.MEDIA_URL + 'temp/' + str(cvid) + '/'
+		temppath = mediaroot + str(cvid)
 		tempfile = mediaroot + filename
 
 		# File validation
