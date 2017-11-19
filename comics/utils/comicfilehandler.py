@@ -1,24 +1,10 @@
-import os,rarfile,zipfile,tarfile,re,sys
-import comics
+import os,zipfile,tarfile,re
 from shutil import copyfile
 from django.conf import settings
-from operator import attrgetter
-from . import fnameparser
 from . import utils
 from urllib.parse import quote
 
 class ComicFileHandler(object):
-
-	def __init__(self):
-		# Set the unrar tool based on filesystem
-		if os.getenv('TENMA_UNRAR_PATH'):
-			rarfile.UNRAR_TOOL = os.getenv('TENMA_UNRAR_PATH')
-		elif sys.platform == 'win32':		# Windows
-			rarfile.UNRAR_TOOL = os.path.dirname(comics.__file__) + "/utils/unrar/unrar.exe"
-		elif sys.platform == 'darwin':	# Mac
-			rarfile.UNRAR_TOOL = os.path.dirname(comics.__file__) + "/utils/unrar/unrar_mac"
-		elif sys.platform == 'linux':	# Linux
-			rarfile.UNRAR_TOOL = os.path.dirname(comics.__file__) + "/utils/unrar/unrar-nonfree_ubuntu"
 
 	#==================================================================================================
 
@@ -243,9 +229,7 @@ class ComicFileHandler(object):
 
 		ext = os.path.splitext(comic_file)[1].lower()
 		c = comic_file
-		if ext == '.cbr':
-			c = c.replace('.cbr', '.rar')
-		elif ext == '.cbz':
+		if ext == '.cbz':
 			c = c.replace('.cbz', '.zip')
 		elif ext == '.cbt':
 			c = c.replace('.cbt', '.tar')
@@ -261,8 +245,6 @@ class ComicFileHandler(object):
 		# Get extractor
 		ext = os.path.splitext(comic_file)[1].lower()
 		e = None
-		if ext == '.rar':
-			e = rarfile.RarFile(comic_file)
 		if ext == '.zip':
 			e = zipfile.ZipFile(comic_file)
 		if ext == '.tar':
