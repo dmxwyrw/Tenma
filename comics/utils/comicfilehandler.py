@@ -1,11 +1,13 @@
 import os
-import zipfile
-import tarfile
 import re
 from shutil import copyfile
-from django.conf import settings
-from . import utils
+import tarfile
 from urllib.parse import quote
+import zipfile
+
+from django.conf import settings
+
+from . import utils
 
 
 class ComicFileHandler(object):
