@@ -12,7 +12,6 @@ Originally modified on Aug 10, 2016
 '''
 
 import re
-import sys
 import os
 from PIL import Image
 
