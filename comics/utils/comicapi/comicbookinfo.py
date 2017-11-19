@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 '''
 Copyright 2012-2014  Anthony Beville
 Copyright 2017 Brian Pepple
@@ -15,8 +17,9 @@ limitations under the License.
 import json
 from datetime import datetime
 
-from .genericmetadata import GenericMetadata
-from . import comicutils as utils
+from genericmetadata import GenericMetadata
+import utils
+
 
 class ComicBookInfo:
 
@@ -72,7 +75,7 @@ class ComicBookInfo:
         metadata.isEmpty = False
 
         return metadata
-    
+
     def stringFromMetadata(self, metadata):
 
         cbi_container = self.createJSONDictionary(metadata)

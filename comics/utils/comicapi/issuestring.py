@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 '''
 Copyright 2012-2014  Anthony Beville
 Copyright 2017 Brian Pepple
@@ -22,24 +24,25 @@ class IssueString(object):
         self.suffex = ""
         if text is None:
             return
-        
+
         if type(text) == int:
             text = str(text)
-            
+
         if len(text) == 0:
             return
-        
+
         text = str(text)
-        
+
         # skip the minus sign if it's first
         if text[0] == "-":
             start = 1
         else:
             start = 0
-            
+
         # If it's still not numeric at start skip it.
         if text[start].isdigit() or text[start] == ".":
-            # Walk thru the string, look for split point (the first non-numeric).
+            # Walk thru the string, look for split point (the first
+            # non-numeric).
             decimal_count = 0
             for idx in range(start, len(text)):
                 if text[idx] not in "0123456789.":
@@ -51,66 +54,65 @@ class IssueString(object):
                         break
             else:
                 idx = len(text)
-                
+
             # move trailing numeric decimal to suffix
             # (only if there is other junk after )
             if text[idx - 1] == "." and len(text) != idx:
                 idx = idx - 1
-            
-            # if there is no numeric after the minus, make the minus part of the suffix
+
+            # if there is no numeric after the minus, make the minus part of
+            # the suffix
             if idx == 1 and start == 1:
                 idx = 0
-            
+
             part1 = text[0:idx]
             part2 = text[idx:len(text)]
-            
+
             if part1 != "":
                 self.num = float(part1)
             self.suffix = part2
         else:
             self.suffix = text
-            
+
     def asString(self, pad=0):
         # return the float, left side zero-padded, with suffix attached
         if self.num is None:
             return self.suffix
-        
+
         negative = self.num < 0
 
         num_f = abs(self.num)
-            
+
         num_int = int(num_f)
-        num_s = str(num_int) 
+        num_s = str(num_int)
         if float(num_int) != num_f:
             num_s = str(num_f)
-            
+
         num_s += self.suffix
-        
+
         # create padding
         padding = ""
         l = len(str(num_int))
-        if l < pad :
+        if l < pad:
             padding = "0" * (pad - l)
-        
+
         num_s = padding + num_s
         if negative:
             num_s = "-" + num_s
 
         return num_s
-    
+
     def asFloat(self):
         # return the float, with no suffix
-        if self.suffix == u"½":
+        if self.suffix == "½":
             if self.num is not None:
                 return self.num + .5
             else:
                 return .5
         return self.num
-    
+
     def asInt(self):
         # return the int version of the float
         if self.num is None:
             return None
-        return  int(self.num)
-
-        
+        return int(self.num)

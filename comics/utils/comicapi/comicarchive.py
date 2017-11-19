@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 '''
 Copyright 2012-2014  Anthony Beville
 Copyright 2017 Brian Pepple
@@ -12,13 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 '''
 
-import zipfile
+from io import StringIO
+import os
 import sys
 import tempfile
-import os
-from io import StringIO
+import subprocess
+import zipfile
 
 from natsort import natsorted
+from PyPDF2 import PdfFileReader
+
+from comet import CoMet
+from comicbookinfo import ComicBookInfo
+from comicinfoxml import ComicInfoXML
+from filenameparser import FileNameParser
+from genericmetadata import GenericMetadata, PageType
+
 
 try:
     from PIL import Image
@@ -26,57 +37,56 @@ try:
 except ImportError:
     pil_available = False
 
-from .comicinfoxml import ComicInfoXML
-from .comicbookinfo import ComicBookInfo
-from .genericmetadata import GenericMetadata
-from .filenameparser import FileNameParser
 
 class MetaDataStyle:
     CBI = 0
     CIX = 1
-    name = ['ComicBookLover', 'ComicRack']
-    
-    
+    COMET = 2
+    name = ['ComicBookLover', 'ComicRack', 'CoMet']
+
+
 class ZipArchiver:
     ''' Zip Implementation '''
-    
+
     def __init__(self, path):
         self.path = path
-    
+
     def getArchiveComment(self):
         zf = zipfile.ZipFile(self.path, "r")
         comment = zf.comment
         zf.close()
         return comment
-    
+
     def setArchiveComment(self, comment):
         try:
             zf = zipfile.ZipFile(self.path, "a")
             zf.comment = comment
             zf.close()
         except:
-            return  False
+            return False
         else:
             return True
-        
+
     def readArchiveFile(self, archive_file):
         data = ""
         zf = zipfile.ZipFile(self.path, "r")
-        
+
         try:
             data = zf.read(archive_file)
         except zipfile.BadZipfile as e:
-            print >> sys.stderr, u"Bad zipfile [{0}]: {1} :: {2}".format(e, self.path, archive_file)
+            print >> sys.stderr, u"Bad zipfile [{0}]: {1} :: {2}".format(
+                e, self.path, archive_file)
             zf.close()
             raise IOError
         except Exception as e:
             zf.close()
-            print >> sys.stderr, u"Bad zipfile [{0}]: {1} :: {2}".format(e, self.path, archive_file)
+            print >> sys.stderr, u"Bad zipfile [{0}]: {1} :: {2}".format(
+                e, self.path, archive_file)
             raise IOError
         finally:
             zf.close()
         return data
-    
+
     def removeArchiveFile(self, archive_file):
         try:
             self.rebuildZipFile([archive_file])
@@ -84,18 +94,19 @@ class ZipArchiver:
             return False
         else:
             return True
-        
+
     def writeArchiveFile(self, archive_file, data):
         try:
             self.rebuildZipFile([archive_file])
             # Now add the archive file as a new one
-            zf = zipfile.ZipFile(self.path, mode="a", compression=zipfile.ZIP_DEFLATED)
+            zf = zipfile.ZipFile(self.path, mode="a",
+                                 compression=zipfile.ZIP_DEFLATED)
             zf.writestr(archive_file, data)
-            zf.close() 
+            zf.close()
             return True
         except:
-            return False       
-    
+            return False
+
     def getArchiveFilenameList(self):
         try:
             zf = zipfile.ZipFile(self.path, "r")
@@ -103,9 +114,10 @@ class ZipArchiver:
             zf.close()
             return namelist
         except Exception as e:
-            print >> sys.stderr, u"Unable to get zipfile list [{0}]: {1}".format(e, self.path)
+            print >> sys.stderr, u"Unable to get zipfile list [{0}]: {1}".format(
+                e, self.path)
             return []
-        
+
     def rebuildZipFile(self, exclude_list):
         """
         Zip helper func
@@ -114,24 +126,24 @@ class ZipArchiver:
         """
         tmp_fd, tmp_name = tempfile.mkdtemp(dir=os.path.dirname(self.path))
         os.close(tmp_fd)
-        
+
         zin = zipfile.ZipFile(self.path, "r")
         zout = zipfile.ZipFile(tmp_name, "w")
         for item in zin.infolist():
             buffer = zin.read(item.filename)
             if (item.filename not in exclude_list):
                 zout.writestr(item, buffer)
-        
+
         # Preserve the old comment
         zout.comment = zin.comment
-        
+
         zout.close()
         zin.close()
-        
+
         # Replace with the new file
         os.remove(self.path)
         os.rename(tmp_name, self.path)
-        
+
     def copyFromArchive(self, otherArchive):
         """ Replace the current zip with one copied from another archive. """
         try:
@@ -141,19 +153,20 @@ class ZipArchiver:
                 if data is not None:
                     zout.writestr(fname, data)
             zout.close()
-            
+
             # Preserve the old comment
             comment = otherArchive.getArchiveComment()
             if comment is not None:
                 if not self.writeZipComment(self.path, comment):
                     return False
         except Exception as e:
-            print >> sys.stderr, u"Error while copying to {0}: {1}".format(self.path, e)
+            print >> sys.stderr, u"Error while copying to {0}: {1}".format(
+                self.path, e)
             return False
         else:
             return True
-        
-        
+
+
 class FolderArchiver:
 
     """Folder implementation"""
@@ -216,8 +229,8 @@ class FolderArchiver:
                 itemlist.extend(self.listFiles(os.path.join(folder, item)))
 
         return itemlist
-    
-    
+
+
 class UnknownArchiver:
 
     """Unknown implementation"""
@@ -242,54 +255,91 @@ class UnknownArchiver:
 
     def getArchiveFilenameList(self):
         return []
-    
-    
+
+
+class PdfArchiver:
+
+    def __init__(self, path):
+        self.path = path
+
+    def getArchiveComment(self):
+        return ""
+
+    def setArchiveComment(self, comment):
+        return False
+
+    def readArchiveFile(self, page_num):
+        return subprocess.check_output(
+            ['mudraw', '-o', '-', self.path, str(int(os.path.basename(page_num)[:-4]))])
+
+    def writeArchiveFile(self, archive_file, data):
+        return False
+
+    def removeArchiveFile(self, archive_file):
+        return False
+
+    def getArchiveFilenameList(self):
+        out = []
+        pdf = PdfFileReader(open(self.path, 'rb'))
+        for page in range(1, pdf.getNumPages() + 1):
+            out.append("/%04d.jpg" % (page))
+        return out
+
+
 class ComicArchive:
     logo_data = None
-    
+
     class ArchiveType:
-        Zip, Folder, Unknown = range(3)
-        
+        Zip, Folder, Pdf, Unknown = range(4)
+
     def __init__(self, path, default_image_path=None):
         self.path = path
         self.ci_xml_filename = 'ComicInfo.xml'
+        self.comet_default_filename = 'CoMet.xml'
         self.resetCache()
-        # Use file extension to decide which archive test we do first
-        ext = os.path.splitext(path)[1].lower()
         self.archive_type = self.ArchiveType.Unknown
         self.archiver = UnknownArchiver(self.path)
         self.default_image_path = default_image_path
-        
-        if ext == ".cbz" or ext == ".zip":
-            if self.zipTest():
-                self.archive_type = self.ArchiveType.Zip
-                self.archiver = ZipArchiver(self.path)
-                
+
+        if self.zipTest():
+            self.archive_type = self.ArchiveType.Zip
+            self.archiver = ZipArchiver(self.path)
+        elif os.path.basename(self.path)[-3:] == 'pdf':
+            self.archive_type = self.ArchiveType.Pdf
+            self.archiver = PdfArchiver(self.path)
+
     def resetCache(self):
         """ Clears the cached data """
         self.has_cix = None
         self.has_cbi = None
+        self.has_comet = None
+        self.comet_filename = None
         self.page_count = None
         self.page_list = None
         self.cix_md = None
-        
+        self.cbi_md = None
+        self.comet_md = None
+
     def loadCache(self, style_list):
         for style in style_list:
             self.readMetadata(style)
-            
+
     def rename(self, path):
         self.path = path
         self.archiver.path = path
-        
+
     def zipTest(self):
         return zipfile.is_zipfile(self.path)
-    
+
     def isZip(self):
         return self.archive_type == self.ArchiveType.Zip
 
+    def isPdf(self):
+        return self.archive_type == self.ArchiveType.Pdf
+
     def isFolder(self):
         return self.archive_type == self.ArchiveType.Folder
-    
+
     def isWritable(self):
         if self.archive_type == self.ArchiveType.Unknown:
             return False
@@ -305,9 +355,13 @@ class ComicArchive:
             return False
 
         return self.isWritable()
-    
+
     def seemsToBeAComicArchive(self):
-        if (self.isZip() and (self.getNumberOfPages() > 0)):
+        if (
+            (self.isZip() or self.isPdf())
+            and
+            (self.getNumberOfPages() > 0)
+        ):
             return True
         else:
             return False
@@ -317,6 +371,8 @@ class ComicArchive:
             return self.readCIX()
         elif style == MetaDataStyle.CBI:
             return self.readCBI()
+        elif style == MetaDataStyle.COMET:
+            return self.readCoMet()
         else:
             return GenericMetadata()
 
@@ -326,13 +382,17 @@ class ComicArchive:
             retcode = self.writeCIX(metadata)
         elif style == MetaDataStyle.CBI:
             retcode = self.writeCBI(metadata)
+        elif style == MetaDataStyle.COMET:
+            retcode = self.writeCoMet(metadata)
         return retcode
-    
+
     def hasMetadata(self, style):
         if style == MetaDataStyle.CIX:
             return self.hasCIX()
         elif style == MetaDataStyle.CBI:
             return self.hasCBI()
+        elif style == MetaDataStyle.COMET:
+            return self.hasCoMet()
         else:
             return False
 
@@ -342,6 +402,8 @@ class ComicArchive:
             retcode = self.removeCIX()
         elif style == MetaDataStyle.CBI:
             retcode = self.removeCBI()
+        elif style == MetaDataStyle.COMET:
+            retcode = self.removeCoMet()
         return retcode
 
     def getPage(self, index):
@@ -356,7 +418,7 @@ class ComicArchive:
                 image_data = ComicArchive.logo_data
 
         return image_data
-    
+
     def getPageName(self, index):
         if index is None:
             return None
@@ -368,7 +430,7 @@ class ComicArchive:
             return None
 
         return page_list[index]
-    
+
     def getScannerPageIndex(self):
         scanner_page_index = None
 
@@ -422,7 +484,7 @@ class ComicArchive:
             scanner_page_index = count - 1
 
         return scanner_page_index
-    
+
     def getPageNameList(self, sort_list=True):
         if self.page_list is None:
             # get the list file names in the archive, and sort
@@ -446,7 +508,7 @@ class ComicArchive:
                     self.page_list.append(name)
 
         return self.page_list
-    
+
     def getNumberOfPages(self):
 
         if self.page_count is None:
@@ -470,7 +532,7 @@ class ComicArchive:
             return None
 
         return self.archiver.getArchiveComment()
-    
+
     def hasCBI(self):
         if self.has_cbi is None:
             if not self.seemsToBeAComicArchive():
@@ -503,7 +565,7 @@ class ComicArchive:
             self.resetCache()
             return write_success
         return True
-    
+
     def readCIX(self):
         if self.cix_md is None:
             raw_cix = self.readRawCIX()
@@ -568,6 +630,103 @@ class ComicArchive:
             else:
                 self.has_cix = False
         return self.has_cix
+
+    def readCoMet(self):
+        if self.comet_md is None:
+            raw_comet = self.readRawCoMet()
+            if raw_comet is None or raw_comet == "":
+                self.comet_md = GenericMetadata()
+            else:
+                self.comet_md = CoMet().metadataFromString(raw_comet)
+
+            self.comet_md.setDefaultPageList(self.getNumberOfPages())
+            # use the coverImage value from the comet_data to mark the cover in this struct
+            # walk through list of images in file, and find the matching one for md.coverImage
+            # need to remove the existing one in the default
+            if self.comet_md.coverImage is not None:
+                cover_idx = 0
+                for idx, f in enumerate(self.getPageNameList()):
+                    if self.comet_md.coverImage == f:
+                        cover_idx = idx
+                        break
+                if cover_idx != 0:
+                    del (self.comet_md.pages[0]['Type'])
+                    self.comet_md.pages[cover_idx][
+                        'Type'] = PageType.FrontCover
+
+        return self.comet_md
+
+    def readRawCoMet(self):
+        if not self.hasCoMet():
+            print >> sys.stderr, self.path, "doesn't have CoMet data!"
+            return None
+
+        try:
+            raw_comet = self.archiver.readArchiveFile(self.comet_filename)
+        except IOError:
+            print >> sys.stderr, u"Error reading in raw CoMet!"
+            raw_comet = ""
+        return raw_comet
+
+    def writeCoMet(self, metadata):
+
+        if metadata is not None:
+            if not self.hasCoMet():
+                self.comet_filename = self.comet_default_filename
+
+            self.applyArchiveInfoToMetadata(metadata)
+            # Set the coverImage value, if it's not the first page
+            cover_idx = int(metadata.getCoverPageIndexList()[0])
+            if cover_idx != 0:
+                metadata.coverImage = self.getPageName(cover_idx)
+
+            comet_string = CoMet().stringFromMetadata(metadata)
+            write_success = self.archiver.writeArchiveFile(
+                self.comet_filename,
+                comet_string)
+            if write_success:
+                self.has_comet = True
+                self.comet_md = metadata
+            self.resetCache()
+            return write_success
+        else:
+            return False
+
+    def removeCoMet(self):
+        if self.hasCoMet():
+            write_success = self.archiver.removeArchiveFile(
+                self.comet_filename)
+            if write_success:
+                self.has_comet = False
+                self.comet_md = None
+            self.resetCache()
+            return write_success
+        return True
+
+    def hasCoMet(self):
+        if self.has_comet is None:
+            self.has_comet = False
+            if not self.seemsToBeAComicArchive():
+                return self.has_comet
+
+            # look at all xml files in root, and search for CoMet data, get
+            # first
+            for n in self.archiver.getArchiveFilenameList():
+                if (os.path.dirname(n) == "" and
+                        os.path.splitext(n)[1].lower() == '.xml'):
+                    # read in XML file, and validate it
+                    try:
+                        data = self.archiver.readArchiveFile(n)
+                    except:
+                        data = ""
+                        print >> sys.stderr, u"Error reading in Comet XML for validation!"
+                    if CoMet().validateString(data):
+                        # since we found it, save it!
+                        self.comet_filename = n
+                        self.has_comet = True
+                        break
+
+            return self.has_comet
 
     def applyArchiveInfoToMetadata(self, md, calc_page_sizes=False):
         md.pageCount = self.getNumberOfPages()

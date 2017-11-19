@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 '''
 Copyright 2012-2014  Anthony Beville
 Copyright 2017 Brian Pepple
@@ -14,8 +16,9 @@ limitations under the License.
 
 import xml.etree.ElementTree as ET
 
-from .genericmetadata import GenericMetadata
-from . import comicutils as utils
+from genericmetadata import GenericMetadata
+import utils
+
 
 class ComicInfoXML(object):
     writer_synonyms = ['writer', 'plotter', 'scripter']
@@ -25,7 +28,7 @@ class ComicInfoXML(object):
     letterer_synonyms = ['letterer']
     cover_synonyms = ['cover', 'covers', 'coverartist', 'cover artist']
     editor_synonyms = ['editor']
-    
+
     def getParseableCredits(self):
         parseable_credits = []
         parseable_credits.extend(self.writer_synonyms)
@@ -35,20 +38,20 @@ class ComicInfoXML(object):
         parseable_credits.extend(self.letterer_synonyms)
         parseable_credits.extend(self.colorist_synonyms)
         parseable_credits.extend(self.editor_synonyms)
-        
+
         return parseable_credits
-    
+
     def metadataFromString(self, s):
         tree = ET.ElementTree(ET.fromstring(s))
-        
+
         return self.convertXMLToMetadata(tree)
-    
+
     def stringFromMetadata(self, metad):
         header = '<?xml version="1.0"?>\n'
         tree = self.convertMetadataToXML(self, metad)
-        
+
         return header + ET.tostring(tree.getroot())
-        
+
     def indent(self, elem, level=0):
         # For making the XML output readable
         i = "\n" + level * "  "
@@ -73,10 +76,11 @@ class ComicInfoXML(object):
         root.attrib['xmlns:xsi'] = "http://www.w3.org/2001/XMLSchema-instance"
         root.attrib['xmlns:xsd'] = "http://www.w3.org/2001/XMLSchema"
         # helper func
+
         def assign(cix_entry, md_entry):
             if md_entry is not None:
                 ET.SubElement(root, cix_entry).text = u"{0}".format(md_entry)
-        
+
         assign('Title', md.title)
         assign('Series', md.series)
         assign('Number', md.issue)
@@ -92,7 +96,7 @@ class ComicInfoXML(object):
         assign('Year', md.year)
         assign('Month', md.month)
         assign('Day', md.day)
-        
+
         # need to specially process the credits, since they are structured
         # differently than CIX
         credit_writer_list = list()
@@ -102,7 +106,7 @@ class ComicInfoXML(object):
         credit_letterer_list = list()
         credit_cover_list = list()
         credit_editor_list = list()
-        
+
         # first, loop thru credits, and build a list for each role that CIX
         # supports
         for credit in metadata.credits:
@@ -186,7 +190,7 @@ class ComicInfoXML(object):
         # wrap it in an ElementTree instance, and save as XML
         tree = ET.ElementTree(root)
         return tree
-    
+
     def convertXMLToMetadata(self, tree):
 
         root = tree.getroot()
@@ -242,12 +246,12 @@ class ComicInfoXML(object):
         # Now extract the credit info
         for n in root:
             if (n.tag == 'Writer' or
-                n.tag == 'Penciller' or
-                n.tag == 'Inker' or
-                n.tag == 'Colorist' or
-                n.tag == 'Letterer' or
-                n.tag == 'Editor'
-                ):
+                    n.tag == 'Penciller' or
+                    n.tag == 'Inker' or
+                    n.tag == 'Colorist' or
+                    n.tag == 'Letterer' or
+                    n.tag == 'Editor'
+                    ):
                 if n.text is not None:
                     for name in n.text.split(','):
                         metadata.addCredit(name.strip(), n.tag)
@@ -267,7 +271,7 @@ class ComicInfoXML(object):
         metadata.isEmpty = False
 
         return metadata
-    
+
     def writeToExternalFile(self, filename, metadata):
 
         tree = self.convertMetadataToXML(self, metadata)

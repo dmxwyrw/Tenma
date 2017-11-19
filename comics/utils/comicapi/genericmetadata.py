@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 '''
 Copyright 2012-2014  Anthony Beville
 Copyright 2017 Brian Pepple
@@ -12,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 '''
 
-from . import comicutils as utils
+import utils
 
 
 class PageType(object):
@@ -31,13 +33,14 @@ class PageType(object):
     Other = "Other"
     Deleted = "Deleted"
 
+
 class GenericMetadata(object):
-    
+
     def __init__(self):
-        
+
         self.isEmpty = True
         self.TagOrigin = None
-        
+
         self.series = None
         self.issue = None
         self.title = None
@@ -50,11 +53,11 @@ class GenericMetadata(object):
         self.genre = None
         self.language = None  # 2 letter iso code
         self.comments = None  # Use as same way as Summary in CIX
-        
+
         self.volumeCount = None
         self.criticalRating = None
         self.country = None
-        
+
         self.alternateSeries = None
         self.alternateNumber = None
         self.alternateCount = None
@@ -66,7 +69,7 @@ class GenericMetadata(object):
         self.blackAndWhite = None
         self.pageCount = None
         self.maturityRating = None
-        
+
         self.storyArc = None
         self.seriesGroup = None
         self.scanInfo = None
@@ -86,25 +89,25 @@ class GenericMetadata(object):
         self.identifier = None
         self.lastMark = None
         self.coverImage = None
-        
+
     def overlay(self, new_md):
         '''
         Overlay a metadata object on this one.
-        
+
         That is, when the new object has non-None values, over-write them
         to this one.
         '''
-        
+
         def assign(curr, new_value):
             if new_value is not None:
                 if isinstance(new_value, str) and len(new_value) == 0:
                     setattr(self, curr, None)
                 else:
                     setattr(self, curr, new_value)
-                    
+
         if not new_md.isEmpty:
             self.isEmpty = False
-        
+
         assign("series", new_md.series)
         assign("issue", new_md.issue)
         assign("issueCount", new_md.issueCount)
@@ -144,13 +147,13 @@ class GenericMetadata(object):
         assign("lastMark", new_md.lastMark)
 
         self.overlayCredits(new_md.credits)
-        
+
         if len(new_md.tags) > 0:
             assign("tags", new_md.tags)
 
         if len(new_md.pages) > 0:
             assign("pages", new_md.pages)
-            
+
     def overlayCredits(self, new_credits):
         for c in new_credits:
             if 'primary' in c and c['primary']:
@@ -166,7 +169,7 @@ class GenericMetadata(object):
             # otherwise, add it!
             else:
                 self.addCredit(c['person'], c['role'], primary)
-    
+
     def setDefaultPageList(self, page_count):
         # generate a default page list, with the first page marked as the cover
         for i in range(page_count):
@@ -175,7 +178,7 @@ class GenericMetadata(object):
             if i == 0:
                 page_dict['Type'] = PageType.FrontCover
             self.pages.append(page_dict)
-            
+
     def getArchivePageIndex(self, pagenum):
         # convert the displayed page number to the page index of the file in
         # the archive
@@ -183,7 +186,7 @@ class GenericMetadata(object):
             return int(self.pages[pagenum]['Image'])
         else:
             return 0
-        
+
     def getCoverPageIndexList(self):
         # return a list of archive page indices of cover pages
         coverlist = []
@@ -195,7 +198,7 @@ class GenericMetadata(object):
             coverlist.append(0)
 
         return coverlist
-    
+
     def addCredit(self, person, role, primary=False):
 
         credit = dict()
@@ -216,20 +219,20 @@ class GenericMetadata(object):
 
         if not found:
             self.credits.append(credit)
-            
+
     def __str__(self, *args, **kwargs):
         vals = []
         if self.isEmpty:
             return "No metadata"
-        
+
         def add_string(tag, val):
             if val is not None and u"{0}".format(val) != "":
                 vals.append(tag, val)
-                
+
         def add_attr_string(tag):
             val = getattr(self, tag)
             add_string(tag, val)
-            
+
         add_attr_string("series")
         add_attr_string("issue")
         add_attr_string("issueCount")
@@ -257,7 +260,7 @@ class GenericMetadata(object):
         add_attr_string("rights")
         add_attr_string("identifier")
         add_attr_string("lastMark")
-        
+
         if self.blackAndWhite:
             add_attr_string("blackAndWhite")
         add_attr_string("maturityRating")
@@ -269,16 +272,15 @@ class GenericMetadata(object):
         add_attr_string("locations")
         add_attr_string("comments")
         add_attr_string("notes")
-        
+
         add_string("tags", utils.listToString(self.tags))
-        
+
         for c in self.credits:
             primary = ""
             if 'primary' in c and c['primary']:
                 primary = " [P]"
             add_string("credit", c['role'] + ": " + c['person'] + primary)
-        
-        
+
         # find the longest field name
         flen = 0
         for i in vals:
@@ -290,5 +292,5 @@ class GenericMetadata(object):
         fmt_str = u"{0: <" + str(flen) + "} {1}\n"
         for i in vals:
             outstr += fmt_str.format(i[0] + ":", i[1])
-                          
+
         return outstr

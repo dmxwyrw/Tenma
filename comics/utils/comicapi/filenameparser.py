@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 '''
 Copyright 2012-2014  Anthony Beville
 Copyright 2017 Brian Pepple
@@ -38,7 +40,7 @@ class FileNameParser:
         # replace any name separators with spaces
         tmpstr = self.fixSpaces(filename)
         found = False
-        
+
         match = re.search(r'(?<=\sof\s)\d+(?=\s)', tmpstr, re.IGNORECASE)
         if match:
             count = match.group()
