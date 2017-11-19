@@ -7,7 +7,7 @@
 		<ul class="slides">
 			{% for series in allseries %}
 			<li>
-				<a href="{% url 'comics:series' series.slug %}">
+				<a href="{% url 'comics:series-detail' series.slug %}">
 					<div class="image">
 						{% if series.issue_numerical_order_set.first.cover %}
 							<img src="{{ series.issue_numerical_order_set.first.cover|smartcrop:"200x305"|urlencode }}" alt="{{ seriesname }}" >
@@ -16,7 +16,7 @@
 						{% endif %}
 					</div>
 				</a>
-				<a href="{% url 'comics:series' series.slug %}"><p>{{ series.name }}</p></a>
+				<a href="{% url 'comics:series-detail' series.slug %}"><p>{{ series.name }}</p></a>
 			</li>
 			{% endfor %}
 		</ul>
