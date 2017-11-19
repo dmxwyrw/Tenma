@@ -17,8 +17,8 @@ limitations under the License.
 import json
 from datetime import datetime
 
-from genericmetadata import GenericMetadata
-import utils
+from .genericmetadata import GenericMetadata
+from .utils import getLanguageDict, getLanguageFromISO
 
 
 class ComicBookInfo:
@@ -67,8 +67,8 @@ class ComicBookInfo:
             # reverse look-up
             pattern = metadata.language
             metadata.language = None
-            for key in utils.getLanguageDict():
-                if utils.getLanguageDict()[key] == pattern.encode('utf-8'):
+            for key in getLanguageDict():
+                if getLanguageDict()[key] == pattern.encode('utf-8'):
                     metadata.language = key
                     break
 
@@ -125,7 +125,7 @@ class ComicBookInfo:
         assign('genre', metadata.genre)
         assign('volume', toInt(metadata.volume))
         assign('numberOfVolumes', toInt(metadata.volumeCount))
-        assign('language', utils.getLanguageFromISO(metadata.language))
+        assign('language', getLanguageFromISO(metadata.language))
         assign('country', metadata.country)
         assign('rating', metadata.criticalRating)
         assign('credits', metadata.credits)

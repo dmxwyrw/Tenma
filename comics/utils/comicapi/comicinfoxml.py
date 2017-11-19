@@ -16,8 +16,8 @@ limitations under the License.
 
 import xml.etree.ElementTree as ET
 
-from genericmetadata import GenericMetadata
-import utils
+from .genericmetadata import GenericMetadata
+from .utils import listToString
 
 
 class ComicInfoXML(object):
@@ -135,31 +135,31 @@ class ComicInfoXML(object):
         # second, convert each list to string, and add to XML struct
         if len(credit_writer_list) > 0:
             node = ET.SubElement(root, 'Writer')
-            node.text = utils.listToString(credit_writer_list)
+            node.text = listToString(credit_writer_list)
 
         if len(credit_penciller_list) > 0:
             node = ET.SubElement(root, 'Penciller')
-            node.text = utils.listToString(credit_penciller_list)
+            node.text = listToString(credit_penciller_list)
 
         if len(credit_inker_list) > 0:
             node = ET.SubElement(root, 'Inker')
-            node.text = utils.listToString(credit_inker_list)
+            node.text = listToString(credit_inker_list)
 
         if len(credit_colorist_list) > 0:
             node = ET.SubElement(root, 'Colorist')
-            node.text = utils.listToString(credit_colorist_list)
+            node.text = listToString(credit_colorist_list)
 
         if len(credit_letterer_list) > 0:
             node = ET.SubElement(root, 'Letterer')
-            node.text = utils.listToString(credit_letterer_list)
+            node.text = listToString(credit_letterer_list)
 
         if len(credit_cover_list) > 0:
             node = ET.SubElement(root, 'CoverArtist')
-            node.text = utils.listToString(credit_cover_list)
+            node.text = listToString(credit_cover_list)
 
         if len(credit_editor_list) > 0:
             node = ET.SubElement(root, 'Editor')
-            node.text = utils.listToString(credit_editor_list)
+            node.text = listToString(credit_editor_list)
 
         assign('Publisher', md.publisher)
         assign('Imprint', md.imprint)

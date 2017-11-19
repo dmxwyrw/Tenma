@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 '''
 
-from genericmetadata import GenericMetadata
-import utils
+from .genericmetadata import GenericMetadata
+from .utils import listToString
 import xml.etree.ElementTree as ET
 
 
@@ -215,7 +215,7 @@ class CoMet(object):
         for n in root:
             if n.tag == 'character':
                 char_list.append(n.text.strip())
-        md.characters = utils.listToString(char_list)
+        md.characters = listToString(char_list)
 
         # Now extract the credit info
         for n in root:

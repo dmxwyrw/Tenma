@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 '''
 
-import utils
+from .utils import listToString
 
 
 class PageType(object):
@@ -273,7 +273,7 @@ class GenericMetadata(object):
         add_attr_string("comments")
         add_attr_string("notes")
 
-        add_string("tags", utils.listToString(self.tags))
+        add_string("tags", listToString(self.tags))
 
         for c in self.credits:
             primary = ""

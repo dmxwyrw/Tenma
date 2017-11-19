@@ -24,11 +24,11 @@ import zipfile
 from natsort import natsorted
 from PyPDF2 import PdfFileReader
 
-from comet import CoMet
-from comicbookinfo import ComicBookInfo
-from comicinfoxml import ComicInfoXML
-from filenameparser import FileNameParser
-from genericmetadata import GenericMetadata, PageType
+from .comet import CoMet
+from .comicbookinfo import ComicBookInfo
+from .comicinfoxml import ComicInfoXML
+from .filenameparser import FileNameParser
+from .genericmetadata import GenericMetadata, PageType
 
 
 try:
