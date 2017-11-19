@@ -27,7 +27,7 @@ urlpatterns = [
     url(r'^arc/(?P<slug>[\w\-]+)/$',
         ArcDetail.as_view(),
         name='arc-detail'),
-    url(r'^team/(?P<slug>[\w\-]+)/$', TeamDetail.as_view(), name='team'),
+    url(r'^team/(?P<slug>[\w\-]+)/$', TeamDetail.as_view(), name='team-detail'),
     url(r'^publisher/(?P<slug>[\w\-]+)/$',
         PublisherDetail.as_view(), name='publisher-detail'),
     url(r'^creator/(?P<slug>[\w\-]+)/$',
