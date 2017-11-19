@@ -1,34 +1,36 @@
 import os
 import re
 from shutil import copyfile
-import tarfile
 from urllib.parse import quote
 import zipfile
 
 from django.conf import settings
+
+from .comicapi.comicarchive import ComicArchive
 
 from . import utils
 
 
 class ComicFileHandler(object):
 
-    #=========================================================================
+    def __init__(self, file):
+        self.file = file
 
-    def extract_comic(self, file, cvid):
+    def extract_comic(self, cvid):
         '''
         Extract all the pages from a comic book file.
 
         Returns a dictionary containing the mediaurl and a list of files.
         '''
-        filename = os.path.basename(file)
-        ext = os.path.splitext(filename)[1].lower()
+        ca = ComicArchive(self.file, default_image_path=None)
+        filename = os.path.basename(self.file)
         mediaroot = settings.MEDIA_ROOT + '/temp/'
         mediaurl = settings.MEDIA_URL + 'temp/' + str(cvid) + '/'
         temppath = mediaroot + str(cvid)
         tempfile = mediaroot + filename
 
         # File validation
-        if utils.valid_comic_file(filename):
+        if ca.seemsToBeAComicArchive():
             # If directory already exists, return it.
             # Otherwise, create the directory.
             if os.path.isdir(temppath):
@@ -40,11 +42,11 @@ class ComicFileHandler(object):
 
             # Create temp file if not found.
             if not os.path.isfile(tempfile):
-                copyfile(file, tempfile)
+                copyfile(self.file, tempfile)
                 os.chmod(tempfile, 0o777)
 
-            if ext == '.pdf':
-                utils.extract_images_from_PDF(file, temppath)
+            if ca.isPdf():
+                utils.extract_images_from_PDF(self.file, temppath)
             else:
                 # Change extension if needed
                 comic_file = self.normalise_comic_extension(tempfile)
@@ -53,7 +55,7 @@ class ComicFileHandler(object):
                 extractor = self.get_extractor(comic_file)
                 extractor.extractall(path=temppath)
 
-                if ext == '.zip' or '.cbz':
+                if ca.isZip():
                     extractor.close()
 
             # Delete the file after extraction so that space isn't wasted.
@@ -75,14 +77,14 @@ class ComicFileHandler(object):
 
     #=========================================================================
 
-    def extract_cover(self, file):
+    def extract_cover(self):
         '''
         Extract the cover image from a comic file.
 
         Returns a path to the cover image.
         '''
-        filename = os.path.basename(file)
-        ext = os.path.splitext(filename)[1].lower()
+        ca = ComicArchive(self.file)
+        filename = os.path.basename(self.file)
         mediaroot = settings.MEDIA_ROOT + '/images/'
         mediaurl = 'media/images/'
         tempfile = mediaroot + filename
@@ -91,11 +93,11 @@ class ComicFileHandler(object):
         # File validation
         if utils.valid_comic_file(filename):
             # Copy file to temp directory
-            copyfile(file, tempfile)
+            copyfile(self.file, tempfile)
             os.chmod(tempfile, 0o777)
 
-            if ext == '.pdf':
-                cover = utils.extract_first_image_from_PDF(file, mediaroot)
+            if ca.isPdf():
+                cover = utils.extract_first_image_from_PDF(self.file, mediaroot)
                 cover = mediaurl + cover
             else:
                 # Change extension if needed
@@ -119,7 +121,7 @@ class ComicFileHandler(object):
                 cover = mediaurl + cover_filename
 
                 # Close out zip extractor
-                if ext == '.zip' or '.cbz':
+                if ca.isZip():
                     extractor.close()
 
             # Optimize cover image
@@ -135,22 +137,22 @@ class ComicFileHandler(object):
 
     #=========================================================================
 
-    def get_page_count(self, file):
+    def get_page_count(self):
         page_count = 0
 
-        filename = os.path.basename(file)
-        ext = os.path.splitext(filename)[1].lower()
+        ca = ComicArchive(self.file)
+        filename = os.path.basename(self.file)
         mediaroot = settings.MEDIA_ROOT + '/images/'
         tempfile = mediaroot + filename
 
         # File validation
         if utils.valid_comic_file(filename):
             # Copy file to temp directory
-            copyfile(file, tempfile)
+            copyfile(self.file, tempfile)
             os.chmod(tempfile, 0o777)
 
-            if ext == '.pdf':
-                page_count = utils.get_PDF_page_count(file)
+            if ca.isPdf():
+                page_count = utils.get_PDF_page_count(self.file)
             else:
                 # Change extension if needed
                 comic_file = self.normalise_comic_extension(tempfile)
@@ -163,7 +165,7 @@ class ComicFileHandler(object):
                         page_count += 1
 
                 # Close out zip extractor
-                if ext == '.zip' or '.cbz':
+                if ca.isZip():
                     extractor.close()
 
         # Delete the temp comic file
@@ -248,13 +250,9 @@ class ComicFileHandler(object):
 
     def get_extractor(self, comic_file):
         ''' Return extractor based on file extension '''
+        ca = ComicArchive(comic_file)
 
-        # Get extractor
-        ext = os.path.splitext(comic_file)[1].lower()
-        e = None
-        if ext == '.zip':
+        if ca.isZip():
             e = zipfile.ZipFile(comic_file)
-        if ext == '.tar':
-            e = tarfile.TarFile(comic_file)
 
         return e
