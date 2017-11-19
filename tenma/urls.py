@@ -16,7 +16,10 @@ Including another URLconf
 from django.conf.urls import include, url
 from django.contrib import admin
 
+from tenma.view import redirect_root
+
 urlpatterns = [
-	url(r'', include('comics.urls')),
-	url(r'^admin/', admin.site.urls),
+    url(r'^$', redirect_root),
+    url(r'', include('comics.urls')),
+    url(r'^admin/', admin.site.urls),
 ]
