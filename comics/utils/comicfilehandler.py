@@ -45,18 +45,19 @@ class ComicFileHandler(object):
                 copyfile(self.file, tempfile)
                 os.chmod(tempfile, 0o777)
 
-            if ca.isPdf():
-                utils.extract_images_from_PDF(self.file, temppath)
-            else:
+            if ca.isZip():
                 # Change extension if needed
                 comic_file = self.normalise_comic_extension(tempfile)
 
                 # Get extractor
                 extractor = self.get_extractor(comic_file)
                 extractor.extractall(path=temppath)
-
-                if ca.isZip():
-                    extractor.close()
+                extractor.close()
+            elif ca.isPdf():
+                utils.extract_images_from_PDF(self.file, temppath)
+            else:
+                # I think it's alright to return None. Probably need to verify
+                return None
 
             # Delete the file after extraction so that space isn't wasted.
             if os.path.isfile(tempfile):
@@ -96,10 +97,7 @@ class ComicFileHandler(object):
             copyfile(self.file, tempfile)
             os.chmod(tempfile, 0o777)
 
-            if ca.isPdf():
-                cover = utils.extract_first_image_from_PDF(self.file, mediaroot)
-                cover = mediaurl + cover
-            else:
+            if ca.isZip():
                 # Change extension if needed
                 comic_file = self.normalise_comic_extension(tempfile)
 
@@ -121,8 +119,12 @@ class ComicFileHandler(object):
                 cover = mediaurl + cover_filename
 
                 # Close out zip extractor
-                if ca.isZip():
-                    extractor.close()
+                extractor.close()
+            elif ca.isPdf():
+                cover = utils.extract_first_image_from_PDF(self.file, mediaroot)
+                cover = mediaurl + cover
+            else:
+                return None
 
             # Optimize cover image
             utils.optimize_image(cover, 75, 540)
@@ -151,9 +153,7 @@ class ComicFileHandler(object):
             copyfile(self.file, tempfile)
             os.chmod(tempfile, 0o777)
 
-            if ca.isPdf():
-                page_count = utils.get_PDF_page_count(self.file)
-            else:
+            if ca.isZip():
                 # Change extension if needed
                 comic_file = self.normalise_comic_extension(tempfile)
 
@@ -165,8 +165,11 @@ class ComicFileHandler(object):
                         page_count += 1
 
                 # Close out zip extractor
-                if ca.isZip():
-                    extractor.close()
+                extractor.close()
+            if ca.isPdf():
+                page_count = utils.get_PDF_page_count(self.file)
+            else:
+                return  None
 
         # Delete the temp comic file
         if os.path.isfile(tempfile):
