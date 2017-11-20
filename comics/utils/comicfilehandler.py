@@ -16,6 +16,7 @@ class ComicFileHandler(object):
     def __init__(self, file):
         self.file = file
 
+    # TODO: Don't bother extracting file. Just read the image from the zip or pdf file.
     def extract_comic(self, cvid):
         '''
         Extract all the pages from a comic book file.
