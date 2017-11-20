@@ -299,6 +299,28 @@ class ComicImporter(object):
 
         return data
 
+    def getIssueCVID(self, md):
+        # Get the issues cvid
+        # TODO: Need to clean this up a bit, but for now it works.
+        cvID = None
+        if md.notes is not None:
+            cvID = re.search('\d+]', md.notes)
+            if cvID is not None:
+                cvID = str(cvID.group(0))
+                cvID = cvID[:-1]
+                return cvID
+
+        if md.webLink is not None:
+            cvID = re.search('/\d+-\d+/', md.webLink)
+            if cvID is not None:
+                cvID = str(cvID.group(0))
+                cvID = cvID.split('-')
+                cvID = cvID[1]
+                cvID = cvID[:-1]
+                return cvID
+
+        return cvID
+
     def getComicMetadata(self, path):
         # TODO: Need to fix the default image path
         ca = ComicArchive(path, default_image_path=None)
@@ -334,11 +356,11 @@ class ComicImporter(object):
                     name=md.publisher,
                     slug=slugify(md.publisher),)
 
-            # Get the issues cvid
-            # TODO: Need to clean this up a bit, but for now it works.
-            cvID = re.search('\d+]', md.notes)
-            cvID = str(cvID.group(0))
-            cvID = cvID[:-1]
+            cvID = self.getIssueCVID(md)
+            if cvID is None:
+                issue_name = md.series + ' #' + md.number
+                self.logger.info('No Comic Vine ID for: %s... skipping.' % issue_name)
+                return False
 
             # let's get the issue info from CV.
             issue_response = self.getCVIssue(cvID)
@@ -512,6 +534,7 @@ class ComicImporter(object):
                     else:
                         self.logger.info('No Creator detail info available for: %s'
                                          % creator_obj)
+            return True
 
     def commitMetadataList(self, md_list):
         for md in md_list:
