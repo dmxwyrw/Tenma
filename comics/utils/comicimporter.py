@@ -350,17 +350,19 @@ class ComicImporter(object):
 
     def addComicFromMetadata(self, md):
         if not md.isEmpty:
-            # Add the Publisher to the database.
-            if md.publisher is not None:
-                publisher_obj, p_create = Publisher.objects.get_or_create(
-                    name=md.publisher,
-                    slug=slugify(md.publisher),)
-
+            # Let's get the issue Comic Vine id from the archive's metadata
+            # If it's not there we'll skipp the issue.
             cvID = self.getIssueCVID(md)
             if cvID is None:
                 issue_name = md.series + ' #' + md.number
                 self.logger.info('No Comic Vine ID for: %s... skipping.' % issue_name)
                 return False
+
+            # Add the Publisher to the database.
+            if md.publisher is not None:
+                publisher_obj, p_create = Publisher.objects.get_or_create(
+                    name=md.publisher,
+                    slug=slugify(md.publisher),)
 
             # let's get the issue info from CV.
             issue_response = self.getCVIssue(cvID)
