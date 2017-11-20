@@ -23,11 +23,9 @@ class ComicFileHandler(object):
         Returns a dictionary containing the mediaurl and a list of files.
         '''
         ca = ComicArchive(self.file)
-        filename = os.path.basename(self.file)
         mediaroot = settings.MEDIA_ROOT + '/temp/'
         mediaurl = settings.MEDIA_URL + 'temp/' + str(cvid) + '/'
         temppath = mediaroot + str(cvid)
-        tempfile = mediaroot + filename
 
         # File validation
         if ca.seemsToBeAComicArchive():
@@ -40,24 +38,17 @@ class ComicFileHandler(object):
             else:
                 os.mkdir(temppath)
 
-            # Create temp file if not found.
-            if not os.path.isfile(tempfile):
-                copyfile(self.file, tempfile)
-                os.chmod(tempfile, 0o777)
-
             if ca.isZip():
-                extractor = self.get_extractor(tempfile)
-                extractor.extractall(path=temppath)
+                extractor = self.get_extractor(self.file)
+                image_list = ca.getPageNameList()
+                for img in image_list:
+                    extractor.extract(img, path=temppath)
                 extractor.close()
             elif ca.isPdf():
                 utils.extract_images_from_PDF(self.file, temppath)
             else:
                 # I think it's alright to return None. Probably need to verify
                 return None
-
-            # Delete the file after extraction so that space isn't wasted.
-            if os.path.isfile(tempfile):
-                os.remove(tempfile)
 
             # Get a list of pages
             pages = self._get_file_list(temppath)
@@ -79,27 +70,21 @@ class ComicFileHandler(object):
         Returns a path to the cover image.
         '''
         ca = ComicArchive(self.file)
-        filename = os.path.basename(self.file)
         mediaroot = settings.MEDIA_ROOT + '/images/'
         mediaurl = 'media/images/'
-        tempfile = mediaroot + filename
         cover = ''
 
         # File validation
         if ca.seemsToBeAComicArchive():
-            # Copy file to temp directory
-            copyfile(self.file, tempfile)
-            os.chmod(tempfile, 0o777)
-
             if ca.isZip():
                 # Get extractor
-                extractor = self.get_extractor(tempfile)
+                extractor = self.get_extractor(self.file)
 
                 # Get cover file name
                 first_image = self._get_first_image(extractor.namelist())
                 normalised_file = self._normalise_image_name(first_image)
                 cover_filename = os.path.splitext(normalised_file)[
-                    0] + '-' + os.path.splitext(filename)[0] + os.path.splitext(normalised_file)[1]
+                    0] + '-' + os.path.splitext(self.file)[0] + os.path.splitext(normalised_file)[1]
 
                 # Delete existing cover if it exists
                 self._delete_existing_cover(mediaroot + cover_filename)
@@ -119,10 +104,6 @@ class ComicFileHandler(object):
 
             # Optimize cover image
             utils.optimize_image(cover, 75, 540)
-
-            # Delete the temp comic file
-            if os.path.isfile(tempfile):
-                os.remove(tempfile)
 
         return cover
 
