@@ -43,7 +43,7 @@ class ComicImporter(object):
 
         # Set basic reusable strings
         self.api_key = Settings.get_solo().api_key
-        self.directory_path = 'files'
+        self.directory_path = Settings.get_solo().comics_directory
 
         # API Strings
         self.baseurl = 'https://comicvine.gamespot.com/api/'
@@ -388,10 +388,10 @@ class ComicImporter(object):
             if s_create:
                 if (data['year']) is not None:
                     exist_count = Series.objects.filter(
-                        name=data['name'], year=data['year']).count()
+                        name__iexact=data['name'], year=data['year']).count()
                 else:
                     exist_count = Series.objects.filter(
-                        name=data['name']).count()
+                        name__iexact=data['name']).count()
                 if exist_count > 1:
                     # Ok, let's drop the count by one since we're including the
                     # new series in the count.
@@ -461,11 +461,24 @@ class ComicImporter(object):
             # Add the characters.
             for ch in issue_response['results']['character_credits']:
                 character_obj, ch_create = Character.objects.get_or_create(
-                    name=ch['name'],
-                    slug=slugify(ch['name']),)
+                    name=ch['name'],)
                 issue_obj.characters.add(character_obj)
 
                 if ch_create:
+                    # Check to see if there is more than one character in the db.
+                    exist_count = Character.objects.filter(name__iexact=ch['name']).count()
+                    if exist_count > 1:
+                        # Ok, let's drop the count by one since we're
+                        # including the new character in the count.
+                        exist_count = exist_count - 1
+                        slugy = ch['name'] + ' ' + str(exist_count)
+
+                    else:
+                        slugy = ch['name']
+
+                    character_obj.slug = slugify(slugy)
+                    character_obj.save()
+                    # Alright get the detail information now.
                     res = self.getCVData(character_obj,
                                          self.character_fields,
                                          ch['api_detail_url'])

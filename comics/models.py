@@ -51,6 +51,10 @@ class Settings(SingletonModel):
         max_length=40,
         blank=True
     )
+    comics_directory = models.CharField('Comics Directory',
+                                        help_text='Directory where comic archives are located.',
+                                        max_length=350,
+                                        blank=True)
 
     def __str__(self):
         return "Settings"
@@ -162,7 +166,7 @@ class Issue(models.Model):
     arcs = models.ManyToManyField(Arc, blank=True)
     characters = models.ManyToManyField(Character, blank=True)
     teams = models.ManyToManyField(Team, blank=True)
-    file = models.FilePathField('File path', path="files/", recursive=True)
+    file = models.CharField('File path', max_length=300)
     cover = models.FilePathField(
         'Cover file path', path="media/images", blank=True)
     status = models.PositiveSmallIntegerField(
