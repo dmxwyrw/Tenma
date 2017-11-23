@@ -321,6 +321,15 @@ class ComicImporter(object):
 
         return cvID
 
+    def create_series_sortname(self, title):
+        sort_name = title
+        contains_the = sort_name.startswith('The ')
+        if contains_the:
+            sort_name = sort_name.replace('The ', '')
+            sort_name = sort_name + ', The'
+
+        return sort_name
+
     def getComicMetadata(self, path):
         # TODO: Need to fix the default image path
         ca = ComicArchive(path, default_image_path=None)
@@ -355,7 +364,8 @@ class ComicImporter(object):
             cvID = self.getIssueCVID(md)
             if cvID is None:
                 issue_name = md.series + ' #' + md.number
-                self.logger.info('No Comic Vine ID for: %s... skipping.' % issue_name)
+                self.logger.info(
+                    'No Comic Vine ID for: %s... skipping.' % issue_name)
                 return False
 
             # Add the Publisher to the database.
@@ -375,12 +385,15 @@ class ComicImporter(object):
                 slugy = (data['name'] + ' ' + data['year'])
             else:
                 slugy = data['name']
+            # Create the series sort name to deal with titles with 'The' in it.
+            sort_name = self.create_series_sortname(data['name'])
 
             # Alright let's create the series object.
             series_obj, s_create = Series.objects.get_or_create(
                 cvid=int(data['cvid']),
                 cvurl=data['cvurl'],
                 name=data['name'],
+                sort_title=sort_name,
                 publisher=publisher_obj,
                 year=data['year'],
                 desc=data['desc'],)
@@ -465,8 +478,10 @@ class ComicImporter(object):
                 issue_obj.characters.add(character_obj)
 
                 if ch_create:
-                    # Check to see if there is more than one character in the db.
-                    exist_count = Character.objects.filter(name__iexact=ch['name']).count()
+                    # Check to see if there is more than one character in the
+                    # db.
+                    exist_count = Character.objects.filter(
+                        name__iexact=ch['name']).count()
                     if exist_count > 1:
                         # Ok, let's drop the count by one since we're
                         # including the new character in the count.

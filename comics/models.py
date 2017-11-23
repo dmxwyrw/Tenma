@@ -131,6 +131,7 @@ class Series(models.Model):
     cvurl = models.URLField(max_length=200, blank=True)
     name = models.CharField('Series name', max_length=200)
     slug = models.SlugField(max_length=200, unique=True)
+    sort_title = models.CharField('Sort Name', max_length=200)
     publisher = models.ForeignKey(
         Publisher, on_delete=models.CASCADE, null=True, blank=True)
     year = models.PositiveSmallIntegerField(
@@ -151,7 +152,7 @@ class Series(models.Model):
 
     class Meta:
         verbose_name_plural = "Series"
-        ordering = ["name"]
+        ordering = ["sort_title"]
 
 
 class Issue(models.Model):
