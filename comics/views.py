@@ -11,6 +11,7 @@ from .tasks import import_comic_files_task, reprocess_issue_task
 
 class SeriesList(ListView):
     model = Series
+    paginate_by =32
 
 
 class SeriesDetail(DetailView):
