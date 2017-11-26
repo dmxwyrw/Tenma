@@ -1,3 +1,7 @@
+from functools import reduce
+import operator
+
+from django.db.models import Q
 from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.generic import ListView, DetailView
@@ -12,6 +16,20 @@ from .tasks import import_comic_files_task, reprocess_issue_task
 class SeriesList(ListView):
     model = Series
     paginate_by =32
+
+
+class SeriesSearchList(SeriesList):
+    def get_queryset(self):
+        result = super(SeriesSearchList, self).get_queryset()
+
+        query = self.request.GET.get('q')
+        if query:
+            query_list = query.split()
+            result = result.filter(
+                reduce(operator.and_,
+                       (Q(name__icontains=q) for q in query_list)))
+
+        return result
 
 
 class SeriesDetail(DetailView):

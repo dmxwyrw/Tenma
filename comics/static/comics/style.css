@@ -309,15 +309,14 @@ a.button.reprocess-issue {
 /*
  *	Homepage Series Listing
  */
-
-.series-filter-wrapper {
+.searchbox-wrapper {
 	margin: 5px auto;
     padding: 0 30px;
     max-width: 480px;
     position: relative;
 }
 
-.series-filter-wrapper i {
+.searchbox-wrapper i {
 	font-size: 1.25rem;
     position: absolute;
     color: #cac7c7;
@@ -325,7 +324,7 @@ a.button.reprocess-issue {
     left: 36px;
 }
 
-#series-filter {
+#searchbox {
 	outline: none;
     max-width: 480px;
     width: 100%;

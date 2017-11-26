@@ -6,17 +6,10 @@
 
 {% block content %}
 
-<div class="searchbox-wrapper">
-    <form id="searchform" action="{% url 'comics:series_search_list' %}" method="get" accept-charset="utf-8">
-        <i class="fa fa-search"></i>
-        <input id="searchbox" name="q" type="text" placeholder="Search">
-    </form>
-</div>
-
 <div class="all-series">
-{% if series_list %}
+{% if result %}
 	<ul>
-		{% for series in series_list %}
+		{% for series in result %}
 			{% if series.issue_set.all %}
 			<li>
 				<a href="{% url 'comics:series-detail' series.slug %}">
