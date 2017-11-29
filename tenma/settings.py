@@ -74,16 +74,16 @@ LOGGING = {
 # Application definition
 
 INSTALLED_APPS = [
-    'widget_tweaks',
-    'kombu.transport.django',
-    'solo.apps.SoloAppConfig',
-    'comics.apps.ComicsConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'comics.apps.ComicsConfig',
+    'kombu.transport.django',
+    'solo.apps.SoloAppConfig',
+    'widget_tweaks',
 ]
 
 MIDDLEWARE_CLASSES = [
