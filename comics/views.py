@@ -18,9 +18,9 @@ class SeriesList(ListView):
     paginate_by =32
 
 
-class SeriesSearchList(SeriesList):
+class SearchSeriesList(SeriesList):
     def get_queryset(self):
-        result = super(SeriesSearchList, self).get_queryset()
+        result = super(SearchSeriesList, self).get_queryset()
 
         query = self.request.GET.get('q')
         if query:

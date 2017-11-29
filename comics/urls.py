@@ -3,7 +3,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from comics.views import SeriesList, SeriesDetail, IssueDetail, CharacterDetail, ArcDetail, \
     TeamDetail, PublisherDetail, CreatorDetail, IssueUpdateView, IssueDeleteView, \
-    ServerSettingsView, read, importer, reprocess, update_issue_status, SeriesSearchList
+    ServerSettingsView, read, importer, reprocess, update_issue_status, SearchSeriesList
 
 app_name = 'comics'
 urlpatterns = [
@@ -11,7 +11,7 @@ urlpatterns = [
         SeriesList.as_view(),
         name='series-list'),
     url(r'^search/?$',
-        SeriesSearchList.as_view(),
+        SearchSeriesList.as_view(),
         name='series_search_list'),
     url(r'^series/(?P<slug>[\w\-]+)/$',
         SeriesDetail.as_view(),
