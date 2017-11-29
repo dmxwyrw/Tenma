@@ -478,16 +478,17 @@ class ComicImporter(object):
                 issue_obj.characters.add(character_obj)
 
                 if ch_create:
-                    # Check to see if there is more than one character in the
-                    # db.
-                    exist_count = Character.objects.filter(
-                        name__iexact=ch['name']).count()
-                    if exist_count > 1:
-                        # Ok, let's drop the count by one since we're
-                        # including the new character in the count.
-                        exist_count = exist_count - 1
-                        slugy = ch['name'] + ' ' + str(exist_count)
+                    # Check to see if the slug or name exists already in the db.
+                    test_slug = slugify(ch['name'])
 
+                    slug_count = Character.objects.filter(
+                        slug__iexact=test_slug).count()
+                    name_count = Character.objects.filter(
+                        name__iexact=ch['name']).count()
+
+                    if (slug_count > 0 or name_count > 1):
+                        max_count = max(slug_count, name_count)
+                        slugy = ch['name'] + ' ' + str(max_count)
                     else:
                         slugy = ch['name']
 
