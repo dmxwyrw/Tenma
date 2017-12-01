@@ -61,7 +61,7 @@ class Settings(SingletonModel):
 
 
 class Arc(models.Model):
-    cvid = models.PositiveIntegerField(null=True)
+    cvid = models.PositiveIntegerField(unique=True)
     cvurl = models.URLField(max_length=200)
     name = models.CharField('Arc name', max_length=200)
     slug = models.SlugField(max_length=200, unique=True)
@@ -74,7 +74,7 @@ class Arc(models.Model):
 
 
 class Team(models.Model):
-    cvid = models.PositiveIntegerField(null=True)
+    cvid = models.PositiveIntegerField(unique=True)
     cvurl = models.URLField(max_length=200)
     name = models.CharField('Team name', max_length=200)
     slug = models.SlugField(max_length=200, unique=True)
@@ -87,7 +87,7 @@ class Team(models.Model):
 
 
 class Character(models.Model):
-    cvid = models.PositiveIntegerField(null=True)
+    cvid = models.PositiveIntegerField(unique=True)
     cvurl = models.URLField(max_length=200)
     name = models.CharField('Character name', max_length=200)
     slug = models.SlugField(max_length=200, unique=True)
@@ -101,7 +101,7 @@ class Character(models.Model):
 
 
 class Creator(models.Model):
-    cvid = models.PositiveIntegerField(null=True)
+    cvid = models.PositiveIntegerField(unique=True)
     cvurl = models.URLField(max_length=200)
     name = models.CharField('Creator name', max_length=200)
     slug = models.SlugField(max_length=200, unique=True)

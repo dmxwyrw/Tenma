@@ -248,7 +248,6 @@ class ComicImporter(object):
         # Year (only exists for Series objects)
         if data['year'] is not None:
             db_obj.year = data['year']
-        db_obj.cvid = int(data['cvid'])
         db_obj.cvurl = data['cvurl']
         db_obj.desc = data['desc']
         db_obj.image = data['image']
@@ -474,7 +473,7 @@ class ComicImporter(object):
             # Add the characters.
             for ch in issue_response['results']['character_credits']:
                 character_obj, ch_create = Character.objects.get_or_create(
-                    name=ch['name'],)
+                    cvid=ch['id'],)
                 issue_obj.characters.add(character_obj)
 
                 if ch_create:
@@ -492,6 +491,7 @@ class ComicImporter(object):
                     else:
                         slugy = ch['name']
 
+                    character_obj.name= ch['name']
                     character_obj.slug = slugify(slugy)
                     character_obj.save()
                     # Alright get the detail information now.
@@ -507,11 +507,22 @@ class ComicImporter(object):
             # Add the storyarc.
             for story_arc in issue_response['results']['story_arc_credits']:
                 story_obj, s_create = Arc.objects.get_or_create(
-                    name=story_arc['name'],
-                    slug=slugify(story_arc['name']),)
+                    cvid=story_arc['id'],)
                 issue_obj.arcs.add(story_obj)
 
                 if s_create:
+                    test_slug = slugify(story_arc['name'])
+                    slug_count = Arc.objects.filter(
+                        slug__iexact=test_slug).count()
+                    if slug_count > 0:
+                        slugy = story_arc['name'] + ' ' + str(slug_count)
+                    else:
+                        slugy = story_arc['name']
+
+                    story_obj.name= story_arc['name']
+                    story_obj.slug = slugify(slugy)
+                    story_obj.save()
+
                     res = self.getCVData(story_obj,
                                          self.arc_fields,
                                          story_arc['api_detail_url'])
@@ -524,8 +535,7 @@ class ComicImporter(object):
             # Add the teams
             for team in issue_response['results']['team_credits']:
                 team_obj, t_create = Team.objects.get_or_create(
-                    name=team['name'],
-                    slug=slugify(team['name']),)
+                    cvid=team['id'],)
                 issue_obj.teams.add(team_obj)
 
                 # Add any existing character to the team.
@@ -537,6 +547,18 @@ class ComicImporter(object):
                             match[0].teams.add(team_obj)
 
                 if t_create:
+                    test_slug = slugify(team['name'])
+                    slug_count = Team.objects.filter(
+                        slug__iexact=test_slug).count()
+                    if slug_count > 0:
+                        slugy = team['name'] + ' ' + str(slug_count)
+                    else:
+                        slugy = team['name']
+
+                    team_obj.name= team['name']
+                    team_obj.slug = slugify(slugy)
+                    team_obj.save()
+
                     res = self.getCVData(team_obj,
                                          self.team_fields,
                                          team['api_detail_url'])
@@ -549,6 +571,7 @@ class ComicImporter(object):
             # Add the creators
             for p in issue_response['results']['person_credits']:
                 creator_obj, c_create = Creator.objects.get_or_create(
+                    cvid=p['id'],
                     name=p['name'],
                     slug=slugify(p['name']),)
 
